@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app.decorators import role_required
-from app.db import query, execute, paginate
+from app.db import query, execute, paginate, get_conn
 
 student_bp = Blueprint('student', __name__)
 
@@ -112,84 +112,46 @@ def course_detail(oid):
     return jsonify(detail)
 
 
-# ---- 选课 ----
+# ---- 选课（存储过程，原子操作） ----
 @student_bp.route('/enroll/<int:oid>', methods=['POST'])
 def enroll(oid):
     sid = get_student_id()
-    offering = query("""SELECT co.semester_id, co.schedule FROM course_offerings co
-                        WHERE co.id=%s AND co.status='published'""", (oid,), one=True)
-    if not offering:
-        flash('该课程不可选', 'danger')
-        return redirect(url_for('student.courses'))
-
-    in_period = query("""SELECT COUNT(*) AS c FROM course_selection_periods
-        WHERE semester_id=%s AND period_type='selection' AND is_active=1
-        AND NOW() BETWEEN start_time AND end_time""", (offering['semester_id'],), one=True)
-    if in_period['c'] == 0:
-        flash('当前不在选课窗口期内', 'warning')
-        return redirect(url_for('student.courses'))
-
-    already = query("SELECT id FROM enrollments WHERE student_id=%s AND course_offering_id=%s AND status='enrolled'",
-                    (sid, oid), one=True)
-    if already:
-        flash('已选过该课程', 'warning')
-        return redirect(url_for('student.courses'))
-
-    # Check time conflict
-    if offering.get('schedule') and offering['schedule'].strip():
-        conflict = query("""SELECT c.name FROM enrollments e
-            JOIN course_offerings co ON e.course_offering_id=co.id
-            JOIN course_offerings co2 ON co2.id=%s
-            JOIN courses c ON co.course_id=c.id
-            WHERE e.student_id=%s AND e.status='enrolled'
-            AND co.semester_id=co2.semester_id
-            AND co.schedule=co2.schedule""", (oid, sid))
-        if conflict:
-            flash(f'上课时间冲突：已选课程「{conflict[0]["name"]}」时间相同', 'danger')
-            return redirect(url_for('student.courses'))
-
-    count = query("SELECT COUNT(*) AS c FROM enrollments WHERE course_offering_id=%s AND status='enrolled'", (oid,), one=True)
-    max_s = query('SELECT max_students FROM course_offerings WHERE id=%s', (oid,), one=True)
-    if count['c'] >= max_s['max_students']:
-        flash('该课程选课人数已满', 'warning')
-        return redirect(url_for('student.courses'))
-
     try:
-        execute('INSERT INTO enrollments (student_id, course_offering_id, status) VALUES (%s,%s,%s)',
-                (sid, oid, 'enrolled'))
-        flash('选课成功！', 'success')
+        conn = get_conn()
+        with conn.cursor() as cur:
+            # p_result: 0=成功, 1=不在窗口, 2=时间冲突, 3=已满, 4=已选过, 5=未发布, 99=系统错误
+            cur.callproc('sp_enroll_course', (sid, oid, 0, ''))
+            conn.commit()
+            # Fetch OUT parameters
+            cur.execute('SELECT @_sp_enroll_course_2, @_sp_enroll_course_3')
+            out = cur.fetchone()
+            result_code = out['@_sp_enroll_course_2']
+            result_msg = out['@_sp_enroll_course_3']
+
+        msgs = {0: 'success', 1: 'warning', 2: 'danger', 3: 'warning', 4: 'warning', 5: 'danger'}
+        flash(result_msg, msgs.get(result_code, 'danger'))
     except Exception as e:
         flash(f'选课失败：{str(e)}', 'danger')
     return redirect(url_for('student.courses'))
 
 
-# ---- 退课 ----
+# ---- 退课（存储过程，原子操作） ----
 @student_bp.route('/drop/<int:oid>', methods=['POST'])
 def drop(oid):
     sid = get_student_id()
-    enrollment = query("SELECT id FROM enrollments WHERE student_id=%s AND course_offering_id=%s AND status='enrolled'",
-                       (sid, oid), one=True)
-    if not enrollment:
-        flash('未选该课程', 'warning')
-        return redirect(url_for('student.schedule'))
-
-    offering = query('SELECT semester_id FROM course_offerings WHERE id=%s', (oid,), one=True)
-    in_period = query("""SELECT COUNT(*) AS c FROM course_selection_periods
-        WHERE semester_id=%s AND period_type='drop' AND is_active=1
-        AND NOW() BETWEEN start_time AND end_time""", (offering['semester_id'],), one=True)
-    if in_period['c'] == 0:
-        flash('当前不在退课窗口期内', 'warning')
-        return redirect(url_for('student.schedule'))
-
-    grade = query("SELECT status FROM grades WHERE enrollment_id=%s", (enrollment['id'],), one=True)
-    if grade and grade['status'] != 'draft':
-        flash('该课程已有成绩记录，无法退课', 'danger')
-        return redirect(url_for('student.schedule'))
-
     try:
-        execute("UPDATE enrollments SET status='dropped', dropped_at=NOW() WHERE id=%s", (enrollment['id'],))
-        execute("DELETE FROM grades WHERE enrollment_id=%s AND status='draft'", (enrollment['id'],))
-        flash('退课成功', 'success')
+        conn = get_conn()
+        with conn.cursor() as cur:
+            # p_result: 0=成功, 1=不在窗口, 2=未找到, 3=有成绩不可退
+            cur.callproc('sp_drop_course', (sid, oid, 0, ''))
+            conn.commit()
+            cur.execute('SELECT @_sp_drop_course_2, @_sp_drop_course_3')
+            out = cur.fetchone()
+            result_code = out['@_sp_drop_course_2']
+            result_msg = out['@_sp_drop_course_3']
+
+        msgs = {0: 'success', 1: 'warning', 2: 'warning', 3: 'danger'}
+        flash(result_msg, msgs.get(result_code, 'danger'))
     except Exception as e:
         flash(f'退课失败：{str(e)}', 'danger')
     return redirect(url_for('student.schedule'))

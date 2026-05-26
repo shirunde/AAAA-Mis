@@ -14,17 +14,14 @@ DELIMITER //
 CREATE PROCEDURE sp_enroll_course(
     IN p_student_id INT,
     IN p_offering_id INT,
-    OUT p_result INT,       -- 0=成功, 1=不在选课窗口, 2=时间冲突, 3=已满, 4=已选过
+    OUT p_result INT,       -- 0=成功, 1=不在选课窗口, 2=时间冲突, 3=已满, 4=已选过, 5=未发布
     OUT p_message VARCHAR(200)
 )
-BEGIN
+main_block: BEGIN
     DECLARE v_semester_id INT;
     DECLARE v_schedule VARCHAR(200);
     DECLARE v_max_students INT;
     DECLARE v_current_count INT;
-    DECLARE v_conflict_count INT;
-    DECLARE v_already_enrolled INT DEFAULT 0;
-    DECLARE v_in_period INT DEFAULT 0;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -35,82 +32,85 @@ BEGIN
 
     START TRANSACTION;
 
-    -- 获取开课信息
+    -- 加行级锁，阻塞并发请求对该开课行的操作
     SELECT semester_id, schedule, max_students
       INTO v_semester_id, v_schedule, v_max_students
       FROM course_offerings
-     WHERE id = p_offering_id AND status = 'published';
+     WHERE id = p_offering_id AND status = 'published'
+       FOR UPDATE;
 
     IF v_semester_id IS NULL THEN
-        ROLLBACK;
         SET p_result = 5;
         SET p_message = '该课程未发布，无法选课';
+        ROLLBACK;
+        LEAVE main_block;
     END IF;
 
-    -- 检查是否在选课窗口期内
-    SELECT COUNT(*) INTO v_in_period
-      FROM course_selection_periods
-     WHERE semester_id = v_semester_id
-       AND period_type = 'selection'
-       AND is_active = 1
-       AND NOW() BETWEEN start_time AND end_time;
-
-    IF v_in_period = 0 THEN
-        ROLLBACK;
+    -- 检查选课窗口
+    IF NOT EXISTS (
+        SELECT 1 FROM course_selection_periods
+         WHERE semester_id = v_semester_id
+           AND period_type = 'selection'
+           AND is_active = 1
+           AND NOW() BETWEEN start_time AND end_time
+    ) THEN
         SET p_result = 1;
         SET p_message = '当前不在选课窗口期内';
+        ROLLBACK;
+        LEAVE main_block;
     END IF;
 
-    -- 检查是否已经选过
-    SELECT COUNT(*) INTO v_already_enrolled
-      FROM enrollments
-     WHERE student_id = p_student_id
-       AND course_offering_id = p_offering_id
-       AND status = 'enrolled';
-
-    IF v_already_enrolled > 0 THEN
-        ROLLBACK;
+    -- 检查是否已选
+    IF EXISTS (
+        SELECT 1 FROM enrollments
+         WHERE student_id = p_student_id
+           AND course_offering_id = p_offering_id
+           AND status = 'enrolled'
+    ) THEN
         SET p_result = 4;
         SET p_message = '已选过该课程，无需重复选课';
-    END IF;
-
-    -- 检查时间冲突（同一学生已选课程中是否有时间重叠）
-    SELECT COUNT(*) INTO v_conflict_count
-      FROM enrollments e
-      JOIN course_offerings co ON e.course_offering_id = co.id
-     WHERE e.student_id = p_student_id
-       AND e.status = 'enrolled'
-       AND co.semester_id = v_semester_id
-       AND co.schedule = v_schedule
-       AND v_schedule IS NOT NULL
-       AND v_schedule != '';
-
-    IF v_conflict_count > 0 THEN
         ROLLBACK;
-        SET p_result = 2;
-        SET p_message = CONCAT('上课时间冲突：', v_schedule);
+        LEAVE main_block;
     END IF;
 
-    -- 检查容量
+    -- 检查时间冲突
+    IF v_schedule IS NOT NULL AND v_schedule != '' THEN
+        IF EXISTS (
+            SELECT 1 FROM enrollments e
+            JOIN course_offerings co ON e.course_offering_id = co.id
+            WHERE e.student_id = p_student_id
+              AND e.status = 'enrolled'
+              AND co.semester_id = v_semester_id
+              AND co.schedule = v_schedule
+        ) THEN
+            SET p_result = 2;
+            SET p_message = CONCAT('上课时间冲突：', v_schedule);
+            ROLLBACK;
+            LEAVE main_block;
+        END IF;
+    END IF;
+
+    -- 容量检查（FOR UPDATE已锁行，此处COUNT为准确值）
     SELECT COUNT(*) INTO v_current_count
       FROM enrollments
      WHERE course_offering_id = p_offering_id
        AND status = 'enrolled';
 
     IF v_current_count >= v_max_students THEN
-        ROLLBACK;
         SET p_result = 3;
         SET p_message = '该课程选课人数已满';
+        ROLLBACK;
+        LEAVE main_block;
     END IF;
 
-    -- 执行选课
+    -- 原子执行选课
     INSERT INTO enrollments (student_id, course_offering_id, status, enrolled_at)
     VALUES (p_student_id, p_offering_id, 'enrolled', NOW());
 
     COMMIT;
     SET p_result = 0;
     SET p_message = '选课成功';
-END //
+END main_block //
 
 
 -- =====================================================
@@ -119,13 +119,12 @@ END //
 CREATE PROCEDURE sp_drop_course(
     IN p_student_id INT,
     IN p_offering_id INT,
-    OUT p_result INT,       -- 0=成功, 1=不在退课窗口, 2=已退选
+    OUT p_result INT,       -- 0=成功, 1=不在退课窗口, 2=未找到记录, 3=有成绩不可退
     OUT p_message VARCHAR(200)
 )
-BEGIN
-    DECLARE v_enrollment_id INT DEFAULT NULL;
+main_block: BEGIN
+    DECLARE v_enrollment_id INT;
     DECLARE v_semester_id INT;
-    DECLARE v_in_period INT DEFAULT 0;
     DECLARE v_grade_status VARCHAR(20);
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
@@ -137,52 +136,54 @@ BEGIN
 
     START TRANSACTION;
 
-    -- 查找选课记录
+    -- 加锁查找选课记录
     SELECT e.id, co.semester_id
       INTO v_enrollment_id, v_semester_id
       FROM enrollments e
       JOIN course_offerings co ON e.course_offering_id = co.id
      WHERE e.student_id = p_student_id
        AND e.course_offering_id = p_offering_id
-       AND e.status = 'enrolled';
+       AND e.status = 'enrolled'
+       FOR UPDATE;
 
     IF v_enrollment_id IS NULL THEN
-        ROLLBACK;
         SET p_result = 2;
         SET p_message = '未选该课程或已退选';
+        ROLLBACK;
+        LEAVE main_block;
     END IF;
 
-    -- 检查是否已有成绩录入
+    -- 检查成绩状态
     SELECT status INTO v_grade_status
       FROM grades
-     WHERE enrollment_id = v_enrollment_id;
+     WHERE enrollment_id = v_enrollment_id
+       FOR UPDATE;
 
     IF v_grade_status IS NOT NULL AND v_grade_status != 'draft' THEN
-        ROLLBACK;
         SET p_result = 3;
         SET p_message = '该课程已有成绩记录，无法退课';
+        ROLLBACK;
+        LEAVE main_block;
     END IF;
 
-    -- 检查是否在退课窗口期内
-    SELECT COUNT(*) INTO v_in_period
-      FROM course_selection_periods
-     WHERE semester_id = v_semester_id
-       AND period_type = 'drop'
-       AND is_active = 1
-       AND NOW() BETWEEN start_time AND end_time;
-
-    IF v_in_period = 0 THEN
-        ROLLBACK;
+    -- 检查退课窗口
+    IF NOT EXISTS (
+        SELECT 1 FROM course_selection_periods
+         WHERE semester_id = v_semester_id
+           AND period_type = 'drop'
+           AND is_active = 1
+           AND NOW() BETWEEN start_time AND end_time
+    ) THEN
         SET p_result = 1;
         SET p_message = '当前不在退课窗口期内';
+        ROLLBACK;
+        LEAVE main_block;
     END IF;
 
-    -- 执行退课
     UPDATE enrollments
        SET status = 'dropped', dropped_at = NOW()
      WHERE id = v_enrollment_id;
 
-    -- 删除对应的草稿成绩记录
     DELETE FROM grades
      WHERE enrollment_id = v_enrollment_id
        AND status = 'draft';
@@ -190,7 +191,7 @@ BEGIN
     COMMIT;
     SET p_result = 0;
     SET p_message = '退课成功';
-END //
+END main_block //
 
 
 -- =====================================================
