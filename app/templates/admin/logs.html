@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}操作日志{% endblock %}{% block page_title %}操作日志{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body">
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4"><input type="text" name="action" class="form-control" placeholder="搜索操作类型" value="{{ action_filter }}"></div>
+    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">筛选</button></div>
+</form>
+<div class="table-responsive">
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>ID</th><th>用户</th><th>操作</th><th>对象类型</th><th>对象ID</th><th>详情</th><th>时间</th></tr></thead>
+    <tbody>
+        {% for l in items %}
+        <tr><td>{{ l.id }}</td><td>{{ l.username or '-' }}</td><td><code>{{ l.action }}</code></td>
+            <td>{{ l.target_type or '-' }}</td><td>{{ l.target_id or '-' }}</td>
+            <td><small>{{ l.detail[:100] if l.detail else '-' }}</small></td>
+            <td><small>{{ l.created_at }}</small></td></tr>
+        {% endfor %}
+    </tbody>
+</table></div>
+{% include "_pagination.html" %}
+</div></div>
+{% endblock %}

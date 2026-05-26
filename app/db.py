@@ -75,3 +75,34 @@ def insert(sql, args=None):
         cur.execute(sql, args)
         conn.commit()
         return cur.lastrowid
+
+
+def paginate(sql, args=None, page=1, per_page=None, count_sql=None, count_args=None):
+    """分页查询，返回 {items, total, pages, page, per_page}"""
+    from flask import current_app
+    if per_page is None:
+        per_page = current_app.config['PER_PAGE']
+
+    page = max(1, int(page))
+
+    # Count total
+    if count_sql:
+        total = query(count_sql, count_args or args, one=True)['total']
+    else:
+        # Auto-wrap: SELECT COUNT(*) FROM (sql) AS _count
+        wrapped = f"SELECT COUNT(*) AS total FROM ({sql}) AS _count"
+        total = query(wrapped, args, one=True)['total']
+
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, pages)
+    offset = (page - 1) * per_page
+
+    items = query(f"{sql} LIMIT {per_page} OFFSET {offset}", args)
+
+    return {
+        'items': items,
+        'total': total,
+        'pages': pages,
+        'page': page,
+        'per_page': per_page
+    }

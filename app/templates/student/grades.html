@@ -1,110 +1,65 @@
 {% extends "base.html" %}
-{% block title %}成绩查询{% endblock %}
+{% block title %}成绩查询{% endblock %}{% block page_title %}成绩单{% endblock %}
 {% block content %}
-<h4 class="mb-3"><i class="bi bi-file-earmark-text"></i> 成绩单</h4>
-
 {% if grades %}
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card text-bg-primary"><div class="card-body text-center">
-            <h3>{{ "%.2f"|format(gpa|float) if gpa else '0.00' }}</h3>
-            <p class="mb-0">GPA</p>
-        </div></div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-bg-success"><div class="card-body text-center">
-            <h3>{{ total_credits }}</h3><p class="mb-0">总学分</p>
-        </div></div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-bg-info"><div class="card-body text-center">
-            <h3>{{ graded_count }}</h3><p class="mb-0">已出成绩</p>
-        </div></div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-bg-secondary"><div class="card-body text-center">
-            <h3>{{ total_count }}</h3><p class="mb-0">总课程数</p>
-        </div></div>
-    </div>
+    <div class="col-md-3"><div class="card text-bg-primary"><div class="card-body text-center"><h3>{{ "%.2f"|format(gpa|float) }}</h3><p class="mb-0">GPA</p></div></div></div>
+    <div class="col-md-3"><div class="card text-bg-success"><div class="card-body text-center"><h3>{{ total_credits }}</h3><p class="mb-0">总学分</p></div></div></div>
+    <div class="col-md-3"><div class="card text-bg-info"><div class="card-body text-center"><h3>{{ graded_count }}</h3><p class="mb-0">已出成绩</p></div></div></div>
+    <div class="col-md-3"><div class="card text-bg-secondary"><div class="card-body text-center"><h3>{{ total_count }}</h3><p class="mb-0">总课程数</p></div></div></div>
 </div>
 
+<div class="card"><div class="card-body">
+<div class="table-responsive">
 <table class="table table-bordered table-hover">
-    <thead class="table-dark">
-        <tr><th>学期</th><th>课程代码</th><th>课程名称</th><th>类型</th><th>学分</th><th>教师</th><th>平时</th><th>期末</th><th>总评</th><th>绩点</th><th>状态</th></tr>
-    </thead>
+    <thead class="table-dark"><tr><th>学期</th><th>课程代码</th><th>课程名称</th><th>类型</th><th>学分</th><th>教师</th><th>平时</th><th>期末</th><th>总评</th><th>绩点</th><th>状态</th></tr></thead>
     <tbody>
         {% for g in grades %}
-        <tr>
-            <td><small>{{ g.semester_name }}</small></td><td>{{ g.course_code }}</td><td>{{ g.course_name }}</td>
-            <td>{% if g.course_type == 'required' %}必修{% elif g.course_type == 'elective' %}选修{% else %}任选{% endif %}</td>
+        <tr><td><small>{{ g.semester_name }}</small></td><td>{{ g.course_code }}</td><td>{{ g.course_name }}</td>
+            <td>{% if g.course_type=='required' %}必修{% elif g.course_type=='elective' %}选修{% else %}任选{% endif %}</td>
             <td>{{ g.credit }}</td><td>{{ g.teacher_name }}</td>
             <td>{{ g.regular_grade if g.regular_grade is not none else '-' }}</td>
             <td>{{ g.exam_grade if g.exam_grade is not none else '-' }}</td>
             <td><strong>{{ g.total_grade if g.total_grade is not none else '-' }}</strong></td>
             <td>{{ g.gpa_point if g.gpa_point is not none else '-' }}</td>
-            <td>
-                {% if g.grade_status == 'draft' %}<span class="badge bg-secondary">草稿</span>
-                {% elif g.grade_status == 'submitted' %}<span class="badge bg-warning">待审核</span>
-                {% elif g.grade_status == 'approved' %}<span class="badge bg-info">已审核</span>
-                {% elif g.grade_status == 'published' %}<span class="badge bg-success">已发布</span>
-                {% else %}<span class="badge bg-light text-dark">未录入</span>{% endif %}
-            </td>
+            <td>{% if g.grade_status=='published' %}<span class="badge bg-success">已发布</span>
+                {% elif g.grade_status=='approved' %}<span class="badge bg-info">已审核</span>
+                {% elif g.grade_status=='submitted' %}<span class="badge bg-warning">待审核</span>
+                {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}</td>
         </tr>
         {% endfor %}
     </tbody>
-</table>
+</table></div></div></div>
 
-<!-- GPA trend chart -->
-<div class="card mt-4"><div class="card-header">各学期绩点趋势</div>
-    <div class="card-body"><canvas id="gpaChart" height="250"></canvas></div>
+<div class="card mt-4"><div class="card-header"><strong>各学期绩点趋势</strong></div>
+    <div class="card-body"><canvas id="gpaChart" height="200"></canvas></div>
 </div>
 
 {% block extra_js %}
 <script>
-const semesters = [...new Set([{% for g in grades %}'{{ g.semester_name }}'{% if not loop.last %},{% endif %}{% endfor %}])];
-const gpaData = [];
-const creditData = [];
-semesters.forEach(sem => {
-    let weighted = 0, credits = 0;
-    [{% for g in grades %}].forEach(g => {
-        // Simplified calculation - just show existing data
-    });
-});
-
-// Use the data from the backend directly
 const semesterMap = {};
 {% for g in grades %}
 {% if g.gpa_point is not none and g.grade_status in ('approved', 'published') %}
-if (!semesterMap['{{ g.semester_name }}']) {
-    semesterMap['{{ g.semester_name }}'] = {weighted: 0, credits: 0};
-}
-semesterMap['{{ g.semester_name }}'].weighted += {{ g.gpa_point }} * {{ g.credit }};
-semesterMap['{{ g.semester_name }}'].credits += {{ g.credit }};
+if (!semesterMap['{{ g.semester_name }}']) semesterMap['{{ g.semester_name }}'] = {w:0, c:0};
+semesterMap['{{ g.semester_name }}'].w += {{ g.gpa_point }} * {{ g.credit }};
+semesterMap['{{ g.semester_name }}'].c += {{ g.credit }};
 {% endif %}
 {% endfor %}
-
-const sortedSemesters = Object.keys(semesterMap).sort();
-const gpaValues = sortedSemesters.map(k => (semesterMap[k].weighted / semesterMap[k].credits).toFixed(2));
-
+const sorted = Object.keys(semesterMap).sort();
 new Chart(document.getElementById('gpaChart'), {
-    type: 'line',
-    data: {
-        labels: sortedSemesters,
-        datasets: [{
-            label: 'GPA', data: gpaValues,
-            borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.1)',
-            fill: true, tension: 0.3
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: { y: { min: 0, max: 4.0 } }
-    }
+    type: 'line', data: {
+        labels: sorted,
+        datasets: [{ label:'GPA', data: sorted.map(k => (semesterMap[k].w / semesterMap[k].c).toFixed(2)),
+            borderColor:'#0d6efd', backgroundColor:'rgba(13,110,253,0.1)', fill:true, tension:0.3 }]
+    }, options: { responsive:true, scales:{ y:{ min:0, max:4.0 } } }
 });
 </script>
 {% endblock %}
 
 {% else %}
-<p class="text-muted">暂无成绩记录</p>
+<div class="text-center py-5">
+    <i class="bi bi-journal-text" style="font-size:3rem; color:#dee2e6;"></i>
+    <p class="mt-2 text-muted">暂无成绩记录</p>
+</div>
 {% endif %}
 {% endblock %}

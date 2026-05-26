@@ -1,25 +1,54 @@
 {% extends "base.html" %}
-{% block title %}学生管理{% endblock %}
+{% block title %}学生管理{% endblock %}{% block page_title %}学生管理{% endblock %}
 {% block content %}
-<h4 class="mb-3"><i class="bi bi-people-fill"></i> 学生管理</h4>
+<div class="card"><div class="card-body">
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4"><input type="text" name="search" class="form-control" placeholder="搜索姓名/学号/用户名" value="{{ search }}"></div>
+    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">搜索</button></div>
+</form>
+<div class="table-responsive">
 <table class="table table-bordered table-hover">
     <thead class="table-dark"><tr><th>ID</th><th>学号</th><th>姓名</th><th>性别</th><th>专业</th><th>班级</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>
-        {% for s in students %}
-        <tr>
-            <td>{{ s.id }}</td><td>{{ s.student_no }}</td><td>{{ s.name }}</td>
-            <td>{{ '男' if s.gender == 'M' else '女' }}</td>
-            <td>{{ s.major_name }}</td><td>{{ s.class_name }}</td>
-            <td>{% if s.is_active %}<span class="badge bg-success">正常</span>{% else %}<span class="badge bg-danger">已禁用</span>{% endif %}</td>
-            <td>
+        {% for s in items %}
+        <tr><td>{{ s.id }}</td><td>{{ s.student_no }}</td><td>{{ s.name }}</td>
+            <td>{{ '男' if s.gender=='M' else '女' }}</td><td>{{ s.major_name }}</td><td>{{ s.class_name }}</td>
+            <td>{% if s.is_active %}<span class="badge bg-success">正常</span>{% else %}<span class="badge bg-danger">禁用</span>{% endif %}</td>
+            <td nowrap>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ s.id }}">编辑</button>
                 <form method="post" action="{{ url_for('admin.students_toggle', sid=s.id) }}" style="display:inline">
-                    <button class="btn btn-sm btn-outline-{{ 'danger' if s.is_active else 'success' }}">
-                        {{ '禁用' if s.is_active else '启用' }}
-                    </button>
+                    <button class="btn btn-sm btn-outline-{{ 'danger' if s.is_active else 'success' }}">{{ '禁用' if s.is_active else '启用' }}</button>
                 </form>
             </td>
         </tr>
         {% endfor %}
     </tbody>
-</table>
+</table></div>
+{% include "_pagination.html" %}
+</div></div>
+
+{% for s in items %}
+<div class="modal fade" id="editModal{{ s.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.students_edit', sid=s.id) }}">
+            <div class="modal-header"><h5>编辑学生 - {{ s.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">专业</label>
+                    <select name="major_id" class="form-select">
+                        {% for m in majors %}<option value="{{ m.id }}" {% if m.id==s.major_id %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">班级</label>
+                    <select name="class_id" class="form-select">
+                        {% for c in all_classes %}<option value="{{ c.id }}" {% if c.id==s.class_id %}selected{% endif %}>{{ c.name }} ({{ c.grade }})</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">电话</label><input type="text" name="phone" class="form-control" value="{{ s.phone or '' }}"></div>
+                <div class="mb-3"><label class="form-label">邮箱</label><input type="email" name="email" class="form-control" value="{{ s.email or '' }}"></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
 {% endblock %}

@@ -41,53 +41,48 @@ def register():
         return redirect(url_for('index'))
 
     form = RegisterForm(request.form)
+    # Load majors & classes for dropdowns
+    majors_data = query('SELECT * FROM majors ORDER BY id')
+    classes_data = query('SELECT * FROM classes ORDER BY id')
+    form.major_id.choices = [(m['id'], m['name']) for m in majors_data]
+    form.class_id.choices = [(c['id'], f"{c['name']} ({c['grade']})") for c in classes_data]
+
     if request.method == 'POST' and form.validate():
-        # Check if username exists
-        existing = query(
-            'SELECT id FROM users WHERE username = %s',
-            (form.username.data,), one=True
-        )
+        existing = query('SELECT id FROM users WHERE username=%s', (form.username.data,), one=True)
         if existing:
             flash('用户名已存在', 'danger')
-            return render_template('auth/register.html', form=form)
+            return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
 
         try:
-            # Create user
             user_id = insert(
-                """INSERT INTO users (username, password_hash, role)
-                   VALUES (%s, %s, %s)""",
-                (form.username.data,
-                 generate_password_hash(form.password.data),
-                 form.role.data)
-            )
+                """INSERT INTO users (username, password_hash, role) VALUES (%s,%s,%s)""",
+                (form.username.data, generate_password_hash(form.password.data), form.role.data))
 
             role_name = form.role.data
             if role_name == 'student':
-                # Generate student_no
                 import random
                 student_no = f"2023{random.randint(100000, 999999)}"
                 insert(
-                    """INSERT INTO students (user_id, student_no, name, gender, major_id, class_id, enrollment_year, phone, email)
-                       VALUES (%s, %s, %s, %s, 1, 1, 2023, %s, %s)""",
+                    """INSERT INTO students (user_id,student_no,name,gender,major_id,class_id,enrollment_year,phone,email)
+                       VALUES (%s,%s,%s,%s,%s,%s,2023,%s,%s)""",
                     (user_id, student_no, form.name.data, form.gender.data,
-                     form.phone.data, form.email.data)
-                )
+                     form.major_id.data or 1, form.class_id.data or 1,
+                     form.phone.data, form.email.data))
             else:
                 import random
                 teacher_no = f"T{random.randint(10000, 99999)}"
                 insert(
-                    """INSERT INTO teachers (user_id, teacher_no, name, gender, phone, email)
-                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    """INSERT INTO teachers (user_id,teacher_no,name,gender,phone,email)
+                       VALUES (%s,%s,%s,%s,%s,%s)""",
                     (user_id, teacher_no, form.name.data, form.gender.data,
-                     form.phone.data, form.email.data)
-                )
+                     form.phone.data, form.email.data))
 
             flash('注册成功，请登录', 'success')
             return redirect(url_for('auth.login'))
         except Exception as e:
             flash(f'注册失败：{str(e)}', 'danger')
 
-    return render_template('auth/register.html', form=form)
+    return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
 
 
 @auth_bp.route('/logout')

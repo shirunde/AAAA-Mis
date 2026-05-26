@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}成绩单{% endblock %}{% block page_title %}成绩单（打印版）{% endblock %}
+{% block content %}
+<style>@media print { #sidebar, .navbar, footer, .btn { display: none !important; } }</style>
+<div class="card"><div class="card-body">
+<div class="d-flex justify-content-between mb-3 no-print">
+    <h5 class="mb-0">学生成绩单</h5>
+    <button onclick="window.print()" class="btn btn-primary btn-sm"><i class="bi bi-printer"></i> 打印</button>
+</div>
+<hr>
+<div class="row mb-3">
+    <div class="col-md-6"><strong>学号：</strong>{{ student.student_no }}</div>
+    <div class="col-md-6"><strong>姓名：</strong>{{ student.name }}</div>
+    <div class="col-md-6"><strong>专业：</strong>{{ student.major_name }}</div>
+    <div class="col-md-6"><strong>班级：</strong>{{ student.class_name }}</div>
+    <div class="col-md-6"><strong>GPA：</strong><span class="fw-bold fs-5 text-primary">{{ "%.2f"|format(gpa|float) }}</span></div>
+    <div class="col-md-6"><strong>已修学分：</strong>{{ total_credits }}</div>
+</div>
+<table class="table table-bordered table-sm">
+    <thead><tr><th>学期</th><th>课程代码</th><th>课程名称</th><th>学分</th><th>平时</th><th>期末</th><th>总评</th><th>绩点</th></tr></thead>
+    <tbody>
+        {% for g in grades %}
+        <tr><td>{{ g.semester_name }}</td><td>{{ g.course_code }}</td><td>{{ g.course_name }}</td>
+            <td>{{ g.credit }}</td><td>{{ g.regular_grade or '-' }}</td><td>{{ g.exam_grade or '-' }}</td>
+            <td><strong>{{ g.total_grade or '-' }}</strong></td><td>{{ g.gpa_point or '-' }}</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p class="text-muted small mt-4">打印日期：{{ now if now else '' }}</p>
+</div></div>
+{% endblock %}

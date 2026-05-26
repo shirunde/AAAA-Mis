@@ -1,43 +1,78 @@
 body {
     font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", sans-serif;
     background-color: #f5f7fa;
+    margin: 0;
 }
 
-.navbar-brand {
-    font-weight: 700;
-    letter-spacing: 1px;
+/* ---- Sidebar ---- */
+#wrapper { min-height: 100vh; }
+.sidebar {
+    width: 230px;
+    min-width: 230px;
+    min-height: 100vh;
+    transition: margin-left 0.3s, min-width 0.3s;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+.sidebar-header {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar-nav .nav-link {
+    color: rgba(255,255,255,0.7);
+    padding: 0.6rem 1.25rem;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.sidebar-nav .nav-link:hover, .sidebar-nav .nav-link.active {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+}
+.sidebar-collapsed .sidebar { margin-left: -230px; }
+.sidebar-collapsed #page-content { width: 100%; }
+
+#page-content {
+    transition: all 0.3s;
+    overflow-x: hidden;
 }
 
+/* ---- Cards ---- */
 .card {
     border: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     transition: box-shadow 0.2s;
 }
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
 
-.card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+/* ---- Tables ---- */
+.table th { white-space: nowrap; font-size: 0.875rem; }
+.table td { vertical-align: middle; font-size: 0.9rem; }
+.table-responsive { overflow-x: auto; }
+
+/* ---- Progress ---- */
+.progress { background-color: #e9ecef; border-radius: 10px; }
+
+/* ---- Badges ---- */
+.badge { font-weight: 500; }
+
+/* ---- Pagination ---- */
+.pagination { margin-bottom: 0; }
+
+/* ---- Misc ---- */
+.navbar { border-bottom: 1px solid #e5e7eb; }
+.offering-card { cursor: default; }
+.offering-card:hover { border-color: #0d6efd; }
+
+/* ---- Mobile ---- */
+@media (max-width: 992px) {
+    .sidebar { margin-left: -230px; position: fixed; height: 100vh; }
+    .sidebar.show { margin-left: 0; }
+    .sidebar-collapsed .sidebar { margin-left: 0; }
 }
 
-.table th {
-    white-space: nowrap;
-    font-size: 0.875rem;
-}
-
-.table td {
-    vertical-align: middle;
-    font-size: 0.9rem;
-}
-
-.progress {
-    background-color: #e9ecef;
-    border-radius: 10px;
-}
-
-.badge {
-    font-weight: 500;
-}
-
-footer {
-    font-size: 0.8rem;
-    color: #adb5bd;
+/* ---- Print ---- */
+@media print {
+    .sidebar, .navbar, .no-print, footer { display: none !important; }
+    #page-content { margin-left: 0 !important; padding: 0 !important; }
 }

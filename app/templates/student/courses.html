@@ -1,59 +1,87 @@
 {% extends "base.html" %}
-{% block title %}可选课程{% endblock %}
+{% block title %}可选课程{% endblock %}{% block page_title %}可选课程列表{% endblock %}
 {% block content %}
-<h4 class="mb-3"><i class="bi bi-search"></i> 可选课程列表</h4>
-
 <form method="get" class="row g-2 mb-3">
-    <div class="col-md-6">
-        <input type="text" name="search" class="form-control" placeholder="搜索课程名/代码/教师" value="{{ search }}">
-    </div>
-    <div class="col-md-3">
-        <select name="type" class="form-select">
-            <option value="">全部类型</option>
-            <option value="required" {% if type == 'required' %}selected{% endif %}>必修</option>
-            <option value="elective" {% if type == 'elective' %}selected{% endif %}>选修</option>
-            <option value="optional" {% if type == 'optional' %}selected{% endif %}>任选</option>
-        </select>
-    </div>
-    <div class="col-md-3">
-        <button type="submit" class="btn btn-primary w-100">筛选</button>
-    </div>
+    <div class="col-md-5"><input type="text" name="search" class="form-control" placeholder="搜索课程名/代码/教师" value="{{ search }}"></div>
+    <div class="col-md-3"><select name="type" class="form-select"><option value="">全部类型</option>
+        <option value="required" {% if type=='required' %}selected{% endif %}>必修</option>
+        <option value="elective" {% if type=='elective' %}selected{% endif %}>选修</option>
+        <option value="optional" {% if type=='optional' %}selected{% endif %}>任选</option>
+    </select></div>
+    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">筛选</button></div>
 </form>
 
 <div class="row g-3">
-    {% for o in offerings %}
+    {% for o in items %}
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100">
+        <div class="card h-100 offering-card" data-oid="{{ o.id }}">
             <div class="card-body">
-                <h6 class="card-title">{{ o.course_name }}</h6>
-                <p class="card-text small mb-1">代码: {{ o.course_code }} | 学分: {{ o.credit }} | 学时: {{ o.hours }}</p>
-                <p class="card-text small mb-1">教师: {{ o.teacher_name }} {% if o.title %}({{ o.title }}){% endif %}</p>
-                <p class="card-text small mb-1">时间: {{ o.schedule or '待定' }} | 教室: {{ o.classroom or '待定' }}</p>
+                <h6 class="card-title">{{ o.course_name }} <small class="text-muted">({{ o.course_code }})</small></h6>
+                <p class="card-text small mb-1">教师: {{ o.teacher_name }}{% if o.title %}({{ o.title }}){% endif %} | 学分: {{ o.credit }}</p>
+                <p class="card-text small mb-1">{{ o.schedule or '待定' }} | {{ o.classroom or '待定' }}</p>
                 <p class="card-text small mb-2">
-                    类型: {% if o.course_type == 'required' %}<span class="badge bg-danger">必修</span>
-                          {% elif o.course_type == 'elective' %}<span class="badge bg-info">选修</span>
-                          {% else %}<span class="badge bg-secondary">任选</span>{% endif %}
-                    学期: {{ o.semester_name }}
+                    {% if o.course_type=='required' %}<span class="badge bg-danger">必修</span>
+                    {% elif o.course_type=='elective' %}<span class="badge bg-info">选修</span>
+                    {% else %}<span class="badge bg-secondary">任选</span>{% endif %}
+                    {{ o.semester_name }}
                 </p>
                 <div class="d-flex justify-content-between align-items-center">
-                    <div class="progress flex-grow-1 me-2" style="height: 6px;">
-                        <div class="progress-bar {% if o.enrolled_count >= o.max_students %}bg-danger{% elif o.enrolled_count >= o.max_students * 0.8 %}bg-warning{% else %}bg-success{% endif %}"
-                             style="width: {{ (o.enrolled_count / o.max_students * 100)|round(1) }}%"></div>
+                    <div class="progress flex-grow-1 me-2" style="height:6px">
+                        <div class="progress-bar {% if o.enrolled_count>=o.max_students %}bg-danger{% elif o.enrolled_count>=o.max_students*0.8 %}bg-warning{% else %}bg-success{% endif %}"
+                             style="width:{{ (o.enrolled_count/o.max_students*100)|round(1) if o.max_students>0 else 0 }}%"></div>
                     </div>
-                    <small class="text-nowrap">{{ o.enrolled_count }}/{{ o.max_students }}</small>
+                    <small>{{ o.enrolled_count }}/{{ o.max_students }}</small>
                 </div>
             </div>
-            <div class="card-footer">
-                <form method="post" action="{{ url_for('student.enroll', oid=o.id) }}">
-                    <button class="btn btn-sm btn-primary w-100" {% if o.enrolled_count >= o.max_students %}disabled{% endif %}>
-                        {% if o.enrolled_count >= o.max_students %}已满{% else %}选课{% endif %}
-                    </button>
+            <div class="card-footer d-flex gap-2">
+                <button class="btn btn-sm btn-outline-info flex-grow-1 detail-btn" data-oid="{{ o.id }}">详情</button>
+                {% if o.id in enrolled_ids %}
+                <span class="btn btn-sm btn-success disabled flex-grow-1">已选</span>
+                {% else %}
+                <form method="post" action="{{ url_for('student.enroll', oid=o.id) }}" class="flex-grow-1" onsubmit="return confirm('确认选择该课程？')">
+                    <button class="btn btn-sm btn-primary w-100" {% if o.enrolled_count>=o.max_students %}disabled{% endif %}>
+                        {% if o.enrolled_count>=o.max_students %}已满{% else %}选课{% endif %}</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
-    {% else %}
-    <div class="col-12"><p class="text-muted">暂无可选课程</p></div>
-    {% endfor %}
+    {% else %}<div class="col-12"><p class="text-muted">暂无可选课程</p></div>{% endfor %}
 </div>
+{% include "_pagination.html" %}
+
+<!-- Course Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 id="detailTitle">课程详情</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body" id="detailBody">加载中...</div>
+    </div></div>
+</div>
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.detail-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var oid = this.dataset.oid;
+        fetch('/student/course/' + oid + '/detail')
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('detailTitle').textContent = d.course_name + ' (' + d.course_code + ')';
+                document.getElementById('detailBody').innerHTML = `
+                    <table class="table table-bordered"><tbody>
+                        <tr><td width="20%">课程名称</td><td>${d.course_name} (${d.course_code})</td></tr>
+                        <tr><td>学分/学时</td><td>${d.credit} / ${d.hours}</td></tr>
+                        <tr><td>课程类型</td><td>${d.course_type==='required'?'必修':d.course_type==='elective'?'选修':'任选'}</td></tr>
+                        <tr><td>授课教师</td><td>${d.teacher_name} ${d.title?'('+d.title+')':''}</td></tr>
+                        <tr><td>上课时间</td><td>${d.schedule||'待定'}</td></tr>
+                        <tr><td>上课教室</td><td>${d.classroom||'待定'}</td></tr>
+                        <tr><td>选课人数</td><td>${d.enrolled_count}/${d.max_students}</td></tr>
+                        <tr><td>课程描述</td><td>${d.description||'暂无描述'}</td></tr>
+                    </tbody></table>`;
+                new bootstrap.Modal(document.getElementById('detailModal')).show();
+            });
+    });
+});
+</script>
+{% endblock %}
 {% endblock %}

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_simple.html" %}
 {% block title %}注册 - 教务管理系统{% endblock %}
 {% block content %}
 <div class="row justify-content-center mt-4">
@@ -6,7 +6,7 @@
         <div class="card shadow">
             <div class="card-body p-4">
                 <h3 class="text-center mb-4">用户注册</h3>
-                <form method="post">
+                <form method="post" id="registerForm">
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">用户名</label>
@@ -14,7 +14,7 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">角色</label>
-                            <select name="role" class="form-select" required>
+                            <select name="role" id="roleSelect" class="form-select" required>
                                 <option value="student" {% if form.role.data == 'student' %}selected{% endif %}>学生</option>
                                 <option value="teacher" {% if form.role.data == 'teacher' %}selected{% endif %}>教师</option>
                             </select>
@@ -43,6 +43,25 @@
                             </select>
                         </div>
                     </div>
+                    <!-- Student-only fields -->
+                    <div id="studentFields">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">专业</label>
+                                <select name="major_id" id="majorSelect" class="form-select">
+                                    <option value="">-- 选择专业 --</option>
+                                    {% for m in majors %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">班级</label>
+                                <select name="class_id" id="classSelect" class="form-select">
+                                    <option value="">-- 选择班级 --</option>
+                                    {% for c in classes %}<option value="{{ c.id }}" data-major="{{ c.major_id }}">{{ c.name }} ({{ c.grade }})</option>{% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">电话</label>
@@ -55,11 +74,29 @@
                     </div>
                     <button type="submit" class="btn btn-primary w-100">注 册</button>
                 </form>
-                <div class="text-center mt-3">
-                    已有账号？<a href="{{ url_for('auth.login') }}">返回登录</a>
-                </div>
+                <div class="text-center mt-3">已有账号？<a href="{{ url_for('auth.login') }}">返回登录</a></div>
             </div>
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+// Toggle student fields visibility
+document.getElementById('roleSelect').addEventListener('change', function() {
+    document.getElementById('studentFields').style.display = this.value === 'student' ? '' : 'none';
+});
+document.getElementById('roleSelect').dispatchEvent(new Event('change'));
+
+// Cascade: major -> class filter
+document.getElementById('majorSelect').addEventListener('change', function() {
+    var majorId = this.value;
+    document.querySelectorAll('#classSelect option').forEach(function(opt) {
+        if (!opt.value) return;
+        opt.style.display = (majorId === '' || opt.dataset.major === majorId) ? '' : 'none';
+    });
+    document.getElementById('classSelect').value = '';
+});
+</script>
+{% endblock %}
 {% endblock %}

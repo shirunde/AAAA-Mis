@@ -1,11 +1,17 @@
 {% extends "base.html" %}
-{% block title %}成绩统计{% endblock %}
+{% block title %}成绩统计{% endblock %}{% block page_title %}成绩分布统计{% endblock %}
 {% block content %}
-<h4 class="mb-3"><i class="bi bi-bar-chart"></i> 成绩分布统计</h4>
+<form method="get" class="mb-3">
+    <div class="row"><div class="col-md-4">
+        <select name="semester_id" class="form-select" onchange="this.form.submit()">
+            <option value="">-- 全部学期 --</option>
+            {% for s in semesters %}<option value="{{ s.id }}" {% if s.id==selected_semester %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+        </select>
+    </div></div>
+</form>
 
 {% for o in offerings %}
-<div class="card mb-4">
-    <div class="card-header"><strong>{{ o.course_name }}</strong> - {{ o.semester_name }}</div>
+<div class="card mb-4"><div class="card-header"><strong>{{ o.course_name }}</strong> - {{ o.semester_name }}</div>
     <div class="card-body">
         <div class="row">
             <div class="col-md-8"><canvas id="chart{{ o.id }}" height="200"></canvas></div>
@@ -13,42 +19,29 @@
         </div>
     </div>
 </div>
-{% endfor %}
+{% else %}<p class="text-muted">暂无开课记录</p>{% endfor %}
 
 {% block extra_js %}
 <script>
 {% for o in offerings %}
 fetch('{{ url_for("teacher.offering_stats_data", oid=o.id) }}')
-    .then(r => r.json())
-    .then(data => {
-        const labels = ['90-100', '80-89', '70-79', '60-69', '<60'];
-        const values = labels.map(l => {
-            const found = data.distribution.find(d => d.grade_range === l);
-            return found ? found.count : 0;
-        });
+    .then(r => r.json()).then(data => {
+        const labels = ['90-100','80-89','70-79','60-69','<60'];
+        const values = labels.map(l => { const f = data.distribution.find(d => d.grade_range === l); return f ? f.count : 0; });
         new Chart(document.getElementById('chart{{ o.id }}'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '人数', data: values,
-                    backgroundColor: ['#198754','#0dcaf0','#ffc107','#fd7e14','#dc3545']
-                }]
-            },
+            type: 'bar', data: { labels, datasets: [{ label:'人数', data:values,
+                backgroundColor: ['#198754','#0dcaf0','#ffc107','#fd7e14','#dc3545'] }] },
             options: { responsive: true, plugins: { legend: { display: false } } }
         });
-
-        if (data.stats) {
-            const s = data.stats;
+        if (data.stats) { const s = data.stats;
             document.getElementById('stats{{ o.id }}').innerHTML = `
                 <table class="table table-sm"><tbody>
-                    <tr><td>总人数</td><td>${s.total}</td></tr>
+                    <tr><td>总人数</td><td><strong>${s.total}</strong></td></tr>
                     <tr><td>平均分</td><td><strong>${s.avg_grade}</strong></td></tr>
                     <tr><td>最高分</td><td>${s.max_grade}</td></tr>
                     <tr><td>最低分</td><td>${s.min_grade}</td></tr>
                     <tr><td>及格率</td><td><strong>${s.pass_rate}%</strong></td></tr>
-                </tbody></table>`;
-        }
+                </tbody></table>`; }
     });
 {% endfor %}
 </script>

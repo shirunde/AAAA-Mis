@@ -10,86 +10,74 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% if current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="bi bi-mortarboard-fill"></i> 教务管理系统
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    {% set role = current_user.get('role') %}
-                    {% if role == 'admin' %}
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-speedometer2"></i> 控制台</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.semesters') }}"><i class="bi bi-calendar3"></i> 学期管理</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.majors') }}"><i class="bi bi-building"></i> 专业管理</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.classes') }}"><i class="bi bi-people"></i> 班级管理</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.courses') }}"><i class="bi bi-book"></i> 课程管理</a></li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-people-fill"></i> 用户管理</a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ url_for('admin.students') }}">学生管理</a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('admin.teachers') }}">教师管理</a></li>
-                            </ul>
-                        </li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.offerings') }}"><i class="bi bi-check2-square"></i> 开课审核</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.selection_periods') }}"><i class="bi bi-clock"></i> 选课时间</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.grades_review') }}"><i class="bi bi-journal-check"></i> 成绩审核</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.statistics') }}"><i class="bi bi-bar-chart"></i> 统计分析</a></li>
-                    {% elif role == 'teacher' %}
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.dashboard') }}"><i class="bi bi-speedometer2"></i> 控制台</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.apply_offering') }}"><i class="bi bi-plus-square"></i> 申请开课</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.my_offerings') }}"><i class="bi bi-journals"></i> 我的课程</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.grade_stats') }}"><i class="bi bi-bar-chart"></i> 成绩统计</a></li>
-                    {% elif role == 'student' %}
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('student.dashboard') }}"><i class="bi bi-speedometer2"></i> 控制台</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('student.courses') }}"><i class="bi bi-search"></i> 课程查询</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('student.schedule') }}"><i class="bi bi-table"></i> 我的课表</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('student.grades') }}"><i class="bi bi-file-earmark-text"></i> 成绩查询</a></li>
-                    {% endif %}
-                </ul>
-                <ul class="navbar-nav">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle"></i> {{ current_user.get('username') }}
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="bi bi-gear"></i> 个人信息</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> 退出登录</a></li>
-                        </ul>
-                    </li>
+{% set role = current_user.get('role') %}
+<div class="d-flex" id="wrapper">
+    <div class="sidebar bg-dark text-white" id="sidebar">
+        <div class="sidebar-header p-3">
+            <h5 class="mb-0"><i class="bi bi-mortarboard-fill"></i> 教务系统</h5>
+            <small class="text-muted">{% if role=='admin' %}管理员{% elif role=='teacher' %}教师{% else %}学生{% endif %}</small>
+        </div>
+        <ul class="nav flex-column sidebar-nav">
+            {% if role == 'admin' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>控制台</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.semesters') }}"><i class="bi bi-calendar3 me-2"></i>学期管理</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.majors') }}"><i class="bi bi-building me-2"></i>专业管理</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.classes') }}"><i class="bi bi-people me-2"></i>班级管理</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.courses_manage') }}"><i class="bi bi-book me-2"></i>课程管理</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.students') }}"><i class="bi bi-people-fill me-2"></i>学生管理</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.teachers') }}"><i class="bi bi-person-badge me-2"></i>教师管理</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.offerings') }}"><i class="bi bi-check2-square me-2"></i>开课审核</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.selection_periods') }}"><i class="bi bi-clock me-2"></i>选课时间</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.grades_review') }}"><i class="bi bi-journal-check me-2"></i>成绩审核</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.statistics') }}"><i class="bi bi-bar-chart me-2"></i>统计分析</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.logs') }}"><i class="bi bi-list-ul me-2"></i>操作日志</a></li>
+            {% elif role == 'teacher' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>控制台</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.apply_offering') }}"><i class="bi bi-plus-square me-2"></i>申请开课</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.my_offerings') }}"><i class="bi bi-journals me-2"></i>我的课程</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher.grade_stats') }}"><i class="bi bi-bar-chart me-2"></i>成绩统计</a></li>
+            {% elif role == 'student' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('student.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>控制台</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('student.courses') }}"><i class="bi bi-search me-2"></i>课程查询</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('student.schedule') }}"><i class="bi bi-table me-2"></i>我的课表</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('student.grades') }}"><i class="bi bi-file-earmark-text me-2"></i>成绩查询</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('student.transcript') }}"><i class="bi bi-printer me-2"></i>打印成绩单</a></li>
+            {% endif %}
+        </ul>
+    </div>
+    <div id="page-content" class="flex-grow-1">
+        <nav class="navbar navbar-light bg-white shadow-sm px-3">
+            <button class="btn btn-sm btn-outline-secondary" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <span class="ms-2 fw-bold">{% block page_title %}教务管理系统{% endblock %}</span>
+            <div class="ms-auto dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-person-circle"></i> {{ current_user.get('username') }}</a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="bi bi-gear me-2"></i>个人信息</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>退出登录</a></li>
                 </ul>
             </div>
-        </div>
-    </nav>
-    {% endif %}
-
-    <main class="container-fluid mt-3 mb-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
+        </nav>
+        <main class="p-4">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for category, message in messages %}
                     <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+                        {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+                {% endfor %}{% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
 
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="text-center text-muted py-3 border-top">
-        <small>&copy; 2026 校园教务选课与成绩管理系统 - 数据库实训项目</small>
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    {% block extra_js %}{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+var tb=document.getElementById('sidebarToggle');
+if(tb){tb.addEventListener('click',function(){document.getElementById('wrapper').classList.toggle('sidebar-collapsed');});}
+</script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

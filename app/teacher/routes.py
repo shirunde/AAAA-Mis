@@ -147,16 +147,23 @@ def grade_submit_all(oid):
 @teacher_bp.route('/grade-stats')
 def grade_stats():
     tid = get_teacher_id()
+    semester_id = request.args.get('semester_id', '', type=int)
+
+    where = 'AND co.semester_id=%s' if semester_id else ''
+    args = [tid, semester_id] if semester_id else [tid]
+
     offerings = query(
-        """SELECT co.id, c.name AS course_name, sem.name AS semester_name
+        f"""SELECT co.id, c.name AS course_name, sem.name AS semester_name
            FROM course_offerings co
            JOIN courses c ON co.course_id = c.id
            JOIN semesters sem ON co.semester_id = sem.id
-           WHERE co.teacher_id = %s AND co.status IN ('approved','published')
+           WHERE co.teacher_id = %s AND co.status IN ('approved','published') {where}
            ORDER BY co.id DESC""",
-        (tid,)
+        tuple(args)
     )
-    return render_template('teacher/grade_stats.html', offerings=offerings)
+    semesters = query('SELECT * FROM semesters ORDER BY id DESC')
+    return render_template('teacher/grade_stats.html', offerings=offerings,
+                           semesters=semesters, selected_semester=semester_id)
 
 
 @teacher_bp.route('/offering/<int:oid>/stats-data')
