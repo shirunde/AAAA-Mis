@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}班级管理{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-people"></i> 班级管理</h4>
+<button class="btn btn-primary btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#addModal">+ 添加班级</button>
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>ID</th><th>班级名称</th><th>所属专业</th><th>年级</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for c in classes %}
+        <tr><td>{{ c.id }}</td><td>{{ c.name }}</td><td>{{ c.major_name }}</td><td>{{ c.grade }}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ c.id }}">编辑</button>
+                <form method="post" action="{{ url_for('admin.classes_delete', cid=c.id) }}" style="display:inline" onsubmit="return confirm('确认删除？')">
+                    <button class="btn btn-sm btn-outline-danger">删除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.classes_add') }}">
+            <div class="modal-header"><h5 class="modal-title">添加班级</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">班级名称</label><input type="text" name="name" class="form-control" required></div>
+                <div class="mb-3"><label class="form-label">所属专业</label>
+                    <select name="major_id" class="form-select" required>
+                        {% for m in majors %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">年级</label><input type="number" name="grade" class="form-control" value="2023" required></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+{% for c in classes %}
+<div class="modal fade" id="editModal{{ c.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.classes_edit', cid=c.id) }}">
+            <div class="modal-header"><h5 class="modal-title">编辑班级</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">班级名称</label><input type="text" name="name" class="form-control" value="{{ c.name }}" required></div>
+                <div class="mb-3"><label class="form-label">所属专业</label>
+                    <select name="major_id" class="form-select">
+                        {% for m in majors %}<option value="{{ m.id }}" {% if m.id == c.major_id %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">年级</label><input type="number" name="grade" class="form-control" value="{{ c.grade }}" required></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存修改</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
+{% endblock %}

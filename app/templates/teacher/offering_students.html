@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}选课学生名单{% endblock %}
+{% block content %}
+<h4 class="mb-3">
+    <i class="bi bi-list-ul"></i> 选课学生名单
+    <small class="text-muted">{{ offering.course_name }} - {{ offering.semester_name }}</small>
+</h4>
+<a href="{{ url_for('teacher.my_offerings') }}" class="btn btn-sm btn-outline-secondary mb-3">&larr; 返回</a>
+<form method="post" action="{{ url_for('teacher.grade_submit_all', oid=offering.id) }}" class="d-inline">
+    <button class="btn btn-sm btn-warning mb-3" onclick="return confirm('确认批量提交所有已录入分数？')">批量提交成绩</button>
+</form>
+
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>学号</th><th>姓名</th><th>专业</th><th>班级</th><th>平时成绩</th><th>期末成绩</th><th>总评</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for s in students %}
+        <tr>
+            <td>{{ s.student_no }}</td><td>{{ s.name }}</td><td>{{ s.major_name }}</td><td>{{ s.class_name }}</td>
+            <td>{{ s.regular_grade or '-' }}</td><td>{{ s.exam_grade or '-' }}</td>
+            <td><strong>{{ s.total_grade or '-' }}</strong></td>
+            <td>
+                {% if s.grade_status == 'draft' %}<span class="badge bg-secondary">草稿</span>
+                {% elif s.grade_status == 'submitted' %}<span class="badge bg-warning">待审核</span>
+                {% elif s.grade_status == 'approved' %}<span class="badge bg-info">已审核</span>
+                {% elif s.grade_status == 'published' %}<span class="badge bg-success">已发布</span>
+                {% else %}<span class="badge bg-light text-dark">未录入</span>{% endif %}
+            </td>
+            <td nowrap>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#gradeModal{{ s.enrollment_id }}">
+                    {{ '修改' if s.grade_status else '录入' }}
+                </button>
+                {% if s.grade_status == 'draft' and s.regular_grade is not none and s.exam_grade is not none %}
+                <form method="post" action="{{ url_for('teacher.grade_submit', eid=s.enrollment_id) }}" style="display:inline">
+                    <button class="btn btn-sm btn-outline-warning">提交</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% for s in students %}
+<div class="modal fade" id="gradeModal{{ s.enrollment_id }}" tabindex="-1">
+    <div class="modal-dialog modal-sm"><div class="modal-content">
+        <form method="post" action="{{ url_for('teacher.grade_edit', eid=s.enrollment_id) }}">
+            <div class="modal-header"><h5>录入成绩 - {{ s.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">平时成绩 (0-100)</label>
+                    <input type="number" step="0.1" name="regular_grade" class="form-control" min="0" max="100" value="{{ s.regular_grade or '' }}">
+                </div>
+                <div class="mb-3"><label class="form-label">期末成绩 (0-100)</label>
+                    <input type="number" step="0.1" name="exam_grade" class="form-control" min="0" max="100" value="{{ s.exam_grade or '' }}">
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
+{% endblock %}

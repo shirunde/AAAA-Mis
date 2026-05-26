@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}登录 - 教务管理系统{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <h3 class="text-center mb-4">
+                    <i class="bi bi-mortarboard-fill text-primary"></i> 教务管理系统
+                </h3>
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label">用户名</label>
+                        <input type="text" name="username" class="form-control" required
+                               value="{{ form.username.data if form.username.data else '' }}">
+                        {% if form.username.errors %}
+                            <div class="text-danger small">{{ form.username.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">密码</label>
+                        <input type="password" name="password" class="form-control" required>
+                        {% if form.password.errors %}
+                            <div class="text-danger small">{{ form.password.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">登 录</button>
+                </form>
+                <div class="text-center mt-3">
+                    <span class="text-muted">还没有账号？</span>
+                    <a href="{{ url_for('auth.register') }}">立即注册</a>
+                </div>
+                <hr>
+                <div class="text-muted small">
+                    <p class="mb-1"><strong>测试账户：</strong></p>
+                    <p class="mb-1">管理员: admin / admin123</p>
+                    <p class="mb-0">学生/教师请自行注册</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

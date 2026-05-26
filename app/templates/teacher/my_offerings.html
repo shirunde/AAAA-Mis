@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}我的课程{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-journals"></i> 我的开课列表</h4>
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>ID</th><th>课程</th><th>学期</th><th>人数</th><th>教室</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for o in offerings %}
+        <tr>
+            <td>{{ o.id }}</td><td>{{ o.course_name }} ({{ o.course_code }})</td><td>{{ o.semester_name }}</td>
+            <td>{{ o.enrolled_count }}/{{ o.max_students }}</td><td>{{ o.classroom or '-' }}</td><td>{{ o.schedule or '-' }}</td>
+            <td>{% if o.status=='pending' %}<span class="badge bg-warning">待审核</span>
+                {% elif o.status=='approved' %}<span class="badge bg-info">已通过</span>
+                {% elif o.status=='published' %}<span class="badge bg-success">已发布</span>
+                {% else %}<span class="badge bg-danger">已驳回</span>{% endif %}</td>
+            <td>
+                <a href="{{ url_for('teacher.offering_students', oid=o.id) }}" class="btn btn-sm btn-outline-primary">学生名单</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}404 - 页面未找到{% endblock %}
+{% block content %}
+<div class="text-center mt-5">
+    <h1 class="text-muted" style="font-size: 6rem;">404</h1>
+    <p class="lead">页面未找到</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">返回首页</a>
+</div>
+{% endblock %}

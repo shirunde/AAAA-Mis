@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}我的课表{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-table"></i> 我的课表</h4>
+{% if schedule %}
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>课程</th><th>代码</th><th>学分</th><th>教师</th><th>时间</th><th>教室</th><th>学期</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for s in schedule %}
+        <tr>
+            <td>{{ s.course_name }}</td><td>{{ s.course_code }}</td><td>{{ s.credit }}</td>
+            <td>{{ s.teacher_name }}</td><td>{{ s.schedule or '-' }}</td><td>{{ s.classroom or '-' }}</td>
+            <td><small>{{ s.semester_name }}</small></td>
+            <td>
+                <form method="post" action="{{ url_for('student.drop', oid=s.offering_id) }}" onsubmit="return confirm('确认退选该课程？')">
+                    <button class="btn btn-sm btn-outline-danger">退课</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">暂无选课记录，<a href="{{ url_for('student.courses') }}">去选课</a></p>
+{% endif %}
+{% endblock %}

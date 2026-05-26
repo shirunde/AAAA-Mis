@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}教师控制台{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-speedometer2"></i> 教师工作台</h4>
+<div class="row g-3">
+    {% for o in offerings %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-title">{{ o.course_name }} <small class="text-muted">({{ o.course_code }})</small></h6>
+                <p class="card-text small mb-1">学期: {{ o.semester_name }}</p>
+                <p class="card-text small mb-2">选课人数: <strong>{{ o.enrolled_count }}</strong> / {{ o.max_students }}</p>
+                <span class="badge bg-{% if o.status=='pending' %}warning{% elif o.status=='approved' %}info{% elif o.status=='published' %}success{% else %}danger{% endif %}">
+                    {% if o.status=='pending' %}待审核{% elif o.status=='approved' %}已通过{% elif o.status=='published' %}已发布{% else %}已驳回{% endif %}
+                </span>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('teacher.offering_students', oid=o.id) }}" class="btn btn-sm btn-outline-primary">查看学生</a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12"><p class="text-muted">暂无开课记录，请先申请开课。</p></div>
+    {% endfor %}
+</div>
+{% endblock %}

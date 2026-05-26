@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}统计分析{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-bar-chart"></i> 教学数据统计分析</h4>
+
+<!-- 选课统计 -->
+<div class="card mb-4"><div class="card-header"><h5 class="mb-0">选课情况统计</h5></div><div class="card-body">
+    <table class="table table-bordered table-sm">
+        <thead><tr><th>课程代码</th><th>课程名称</th><th>教师</th><th>上限</th><th>已选</th><th>满员率</th></tr></thead>
+        <tbody>
+            {% for s in selection_stats %}
+            <tr><td>{{ s.code }}</td><td>{{ s.course_name }}</td><td>{{ s.teacher_name }}</td>
+                <td>{{ s.max_students }}</td><td>{{ s.enrolled_count }}</td>
+                <td>
+                    <div class="progress"><div class="progress-bar {% if s.enrolled_count >= s.max_students %}bg-danger{% elif s.enrolled_count >= s.max_students * 0.8 %}bg-warning{% else %}bg-success{% endif %}"
+                        style="width: {{ (s.enrolled_count / s.max_students * 100) if s.max_students > 0 else 0 }}%">
+                        {{ (s.enrolled_count / s.max_students * 100)|round(1) if s.max_students > 0 else 0 }}%
+                    </div></div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div></div>
+
+<!-- 成绩分布 -->
+<div class="card mb-4"><div class="card-header"><h5 class="mb-0">成绩分布统计</h5></div><div class="card-body">
+    <div class="row">
+        <div class="col-md-6"><canvas id="gradeChart" height="300"></canvas></div>
+        <div class="col-md-6">
+            <table class="table table-sm">
+                <thead><tr><th>分数段</th><th>人数</th></tr></thead>
+                <tbody>{% for g in grade_dist %}<tr><td>{{ g.grade_range }}</td><td>{{ g.count }}</td></tr>{% endfor %}</tbody>
+            </table>
+        </div>
+    </div>
+</div></div>
+
+<!-- 教师工作量 -->
+<div class="card"><div class="card-header"><h5 class="mb-0">教师教学工作量</h5></div><div class="card-body">
+    <table class="table table-bordered table-sm">
+        <thead><tr><th>教师</th><th>职称</th><th>开课数</th><th>学生总数</th></tr></thead>
+        <tbody>
+            {% for t in teacher_workload %}
+            <tr><td>{{ t.name }}</td><td>{{ t.title or '-' }}</td><td>{{ t.offering_count }}</td><td>{{ t.total_students }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div></div>
+
+{% block extra_js %}
+<script>
+const gradeLabels = [{% for g in grade_dist %}'{{ g.grade_range }}'{% if not loop.last %},{% endif %}{% endfor %}];
+const gradeData = [{% for g in grade_dist %}{{ g.count }}{% if not loop.last %},{% endif %}{% endfor %}];
+new Chart(document.getElementById('gradeChart'), {
+    type: 'bar',
+    data: {
+        labels: gradeLabels,
+        datasets: [{ label: '人数', data: gradeData, backgroundColor: ['#198754','#0dcaf0','#ffc107','#fd7e14','#dc3545'] }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}学期管理{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-calendar3"></i> 学期管理</h4>
+
+<button class="btn btn-primary btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#addModal">+ 添加学期</button>
+
+<table class="table table-bordered table-hover">
+    <thead class="table-dark">
+        <tr><th>ID</th><th>学期名称</th><th>开始日期</th><th>结束日期</th><th>当前学期</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+        {% for s in semesters %}
+        <tr>
+            <td>{{ s.id }}</td>
+            <td>{{ s.name }}</td>
+            <td>{{ s.start_date }}</td>
+            <td>{{ s.end_date }}</td>
+            <td>{% if s.is_current %}<span class="badge bg-success">当前</span>{% else %}-{% endif %}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ s.id }}">编辑</button>
+                <form method="post" action="{{ url_for('admin.semesters_delete', sid=s.id) }}" style="display:inline" onsubmit="return confirm('确认删除？')">
+                    <button class="btn btn-sm btn-outline-danger">删除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Add Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.semesters_add') }}">
+            <div class="modal-header"><h5 class="modal-title">添加学期</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">学期名称</label><input type="text" name="name" class="form-control" placeholder="如：2025-2026-1" required></div>
+                <div class="mb-3"><label class="form-label">开始日期</label><input type="date" name="start_date" class="form-control" required></div>
+                <div class="mb-3"><label class="form-label">结束日期</label><input type="date" name="end_date" class="form-control" required></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="is_current" value="1"><label class="form-check-label">设为当前学期</label></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+
+{% for s in semesters %}
+<div class="modal fade" id="editModal{{ s.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.semesters_edit', sid=s.id) }}">
+            <div class="modal-header"><h5 class="modal-title">编辑学期</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">学期名称</label><input type="text" name="name" class="form-control" value="{{ s.name }}" required></div>
+                <div class="mb-3"><label class="form-label">开始日期</label><input type="date" name="start_date" class="form-control" value="{{ s.start_date }}" required></div>
+                <div class="mb-3"><label class="form-label">结束日期</label><input type="date" name="end_date" class="form-control" value="{{ s.end_date }}" required></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="is_current" value="1" {% if s.is_current %}checked{% endif %}><label class="form-check-label">设为当前学期</label></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存修改</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
+{% endblock %}

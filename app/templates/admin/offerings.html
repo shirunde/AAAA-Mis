@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}开课审核{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-check2-square"></i> 开课申请审核</h4>
+<table class="table table-bordered table-hover">
+    <thead class="table-dark">
+        <tr><th>ID</th><th>课程</th><th>教师</th><th>学期</th><th>人数上限</th><th>教室</th><th>上课时间</th><th>状态</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+        {% for o in offerings %}
+        <tr class="{% if o.status == 'pending' %}table-warning{% elif o.status == 'approved' %}table-info{% elif o.status == 'published' %}table-success{% elif o.status == 'rejected' %}table-danger{% endif %}">
+            <td>{{ o.id }}</td>
+            <td>{{ o.course_name }} ({{ o.course_code }})</td>
+            <td>{{ o.teacher_name }}</td>
+            <td>{{ o.semester_name }}</td>
+            <td>{{ o.max_students }}</td>
+            <td>{{ o.classroom or '-' }}</td>
+            <td>{{ o.schedule or '-' }}</td>
+            <td>{% if o.status == 'pending' %}<span class="badge bg-warning">待审核</span>
+                {% elif o.status == 'approved' %}<span class="badge bg-info">已通过</span>
+                {% elif o.status == 'published' %}<span class="badge bg-success">已发布</span>
+                {% else %}<span class="badge bg-danger">已驳回</span>{% endif %}</td>
+            <td nowrap>
+                {% if o.status == 'pending' %}
+                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#reviewModal{{ o.id }}_approve">通过</button>
+                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#reviewModal{{ o.id }}_reject">驳回</button>
+                {% elif o.status == 'approved' %}
+                <form method="post" action="{{ url_for('admin.offerings_publish', oid=o.id) }}" style="display:inline">
+                    <button class="btn btn-sm btn-primary">发布</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% for o in offerings if o.status == 'pending' %}
+<!-- Approve modal -->
+<div class="modal fade" id="reviewModal{{ o.id }}_approve" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.offerings_review', oid=o.id) }}">
+            <input type="hidden" name="action" value="approved">
+            <div class="modal-header"><h5>通过开课申请</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p>{{ o.course_name }} - {{ o.teacher_name }} - {{ o.semester_name }}</p>
+                <div class="mb-3"><label class="form-label">审核意见</label><textarea name="comment" class="form-control" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-success">确认通过</button></div>
+        </form>
+    </div></div>
+</div>
+<!-- Reject modal -->
+<div class="modal fade" id="reviewModal{{ o.id }}_reject" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.offerings_review', oid=o.id) }}">
+            <input type="hidden" name="action" value="rejected">
+            <div class="modal-header"><h5>驳回开课申请</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p>{{ o.course_name }} - {{ o.teacher_name }}</p>
+                <div class="mb-3"><label class="form-label">驳回原因</label><textarea name="comment" class="form-control" rows="2" required></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-danger">确认驳回</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}注册 - 教务管理系统{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h3 class="text-center mb-4">用户注册</h3>
+                <form method="post">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">用户名</label>
+                            <input type="text" name="username" class="form-control" required value="{{ form.username.data if form.username.data else '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">角色</label>
+                            <select name="role" class="form-select" required>
+                                <option value="student" {% if form.role.data == 'student' %}selected{% endif %}>学生</option>
+                                <option value="teacher" {% if form.role.data == 'teacher' %}selected{% endif %}>教师</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">密码</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">确认密码</label>
+                            <input type="password" name="password2" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">姓名</label>
+                            <input type="text" name="name" class="form-control" required value="{{ form.name.data if form.name.data else '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">性别</label>
+                            <select name="gender" class="form-select">
+                                <option value="M">男</option>
+                                <option value="F">女</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">电话</label>
+                            <input type="text" name="phone" class="form-control" value="{{ form.phone.data if form.phone.data else '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">邮箱</label>
+                            <input type="email" name="email" class="form-control" value="{{ form.email.data if form.email.data else '' }}">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">注 册</button>
+                </form>
+                <div class="text-center mt-3">
+                    已有账号？<a href="{{ url_for('auth.login') }}">返回登录</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

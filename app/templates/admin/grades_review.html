@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}成绩审核{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-journal-check"></i> 成绩审核与发布</h4>
+<div class="mb-3">
+    <form method="post" action="{{ url_for('admin.grades_batch_publish') }}" style="display:inline">
+        <button class="btn btn-sm btn-success" onclick="return confirm('确认批量发布所有已审核成绩？')">批量发布</button>
+    </form>
+</div>
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>ID</th><th>学生</th><th>课程</th><th>教师</th><th>平时</th><th>期末</th><th>总评</th><th>绩点</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for g in grades %}
+        <tr>
+            <td>{{ g.id }}</td><td>{{ g.student_name }}<br><small class="text-muted">{{ g.student_no }}</small></td>
+            <td>{{ g.course_name }}</td><td>{{ g.teacher_name }}</td>
+            <td>{{ g.regular_grade or '-' }}</td><td>{{ g.exam_grade or '-' }}</td>
+            <td><strong>{{ g.total_grade or '-' }}</strong></td><td>{{ g.gpa_point or '-' }}</td>
+            <td>
+                {% if g.status == 'draft' %}<span class="badge bg-secondary">草稿</span>
+                {% elif g.status == 'submitted' %}<span class="badge bg-warning">待审核</span>
+                {% elif g.status == 'approved' %}<span class="badge bg-info">已审核</span>
+                {% else %}<span class="badge bg-success">已发布</span>{% endif %}
+            </td>
+            <td nowrap>
+                {% if g.status == 'submitted' %}
+                <form method="post" action="{{ url_for('admin.grades_approve', gid=g.id) }}" style="display:inline">
+                    <button class="btn btn-sm btn-outline-primary">审核通过</button>
+                </form>
+                {% elif g.status == 'approved' %}
+                <form method="post" action="{{ url_for('admin.grades_publish', gid=g.id) }}" style="display:inline">
+                    <button class="btn btn-sm btn-outline-success">发布</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

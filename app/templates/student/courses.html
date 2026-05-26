@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}可选课程{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-search"></i> 可选课程列表</h4>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-6">
+        <input type="text" name="search" class="form-control" placeholder="搜索课程名/代码/教师" value="{{ search }}">
+    </div>
+    <div class="col-md-3">
+        <select name="type" class="form-select">
+            <option value="">全部类型</option>
+            <option value="required" {% if type == 'required' %}selected{% endif %}>必修</option>
+            <option value="elective" {% if type == 'elective' %}selected{% endif %}>选修</option>
+            <option value="optional" {% if type == 'optional' %}selected{% endif %}>任选</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">筛选</button>
+    </div>
+</form>
+
+<div class="row g-3">
+    {% for o in offerings %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-title">{{ o.course_name }}</h6>
+                <p class="card-text small mb-1">代码: {{ o.course_code }} | 学分: {{ o.credit }} | 学时: {{ o.hours }}</p>
+                <p class="card-text small mb-1">教师: {{ o.teacher_name }} {% if o.title %}({{ o.title }}){% endif %}</p>
+                <p class="card-text small mb-1">时间: {{ o.schedule or '待定' }} | 教室: {{ o.classroom or '待定' }}</p>
+                <p class="card-text small mb-2">
+                    类型: {% if o.course_type == 'required' %}<span class="badge bg-danger">必修</span>
+                          {% elif o.course_type == 'elective' %}<span class="badge bg-info">选修</span>
+                          {% else %}<span class="badge bg-secondary">任选</span>{% endif %}
+                    学期: {{ o.semester_name }}
+                </p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                        <div class="progress-bar {% if o.enrolled_count >= o.max_students %}bg-danger{% elif o.enrolled_count >= o.max_students * 0.8 %}bg-warning{% else %}bg-success{% endif %}"
+                             style="width: {{ (o.enrolled_count / o.max_students * 100)|round(1) }}%"></div>
+                    </div>
+                    <small class="text-nowrap">{{ o.enrolled_count }}/{{ o.max_students }}</small>
+                </div>
+            </div>
+            <div class="card-footer">
+                <form method="post" action="{{ url_for('student.enroll', oid=o.id) }}">
+                    <button class="btn btn-sm btn-primary w-100" {% if o.enrolled_count >= o.max_students %}disabled{% endif %}>
+                        {% if o.enrolled_count >= o.max_students %}已满{% else %}选课{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12"><p class="text-muted">暂无可选课程</p></div>
+    {% endfor %}
+</div>
+{% endblock %}

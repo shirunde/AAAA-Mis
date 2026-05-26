@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}申请开课{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-plus-square"></i> 提交开课申请</h4>
+<div class="col-md-8">
+    <div class="card"><div class="card-body">
+        <form method="post">
+            <div class="row mb-3">
+                <div class="col-6"><label class="form-label">课程</label>
+                    <select name="course_id" class="form-select" required>
+                        <option value="">-- 选择课程 --</option>
+                        {% for c in courses %}<option value="{{ c.id }}">{{ c.name }} ({{ c.code }}) - {{ c.credit }}学分</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-6"><label class="form-label">学期</label>
+                    <select name="semester_id" class="form-select" required>
+                        {% for s in semesters %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-4"><label class="form-label">最大选课人数</label><input type="number" name="max_students" class="form-control" value="60" required></div>
+                <div class="col-4"><label class="form-label">上课教室</label><input type="text" name="classroom" class="form-control" placeholder="如：教学楼A301"></div>
+                <div class="col-4"><label class="form-label">上课时间</label><input type="text" name="schedule" class="form-control" placeholder="如：周一1-2节"></div>
+            </div>
+            <div class="mb-3"><label class="form-label">申请理由</label><textarea name="apply_reason" class="form-control" rows="3"></textarea></div>
+            <button type="submit" class="btn btn-primary">提交申请</button>
+        </form>
+    </div></div>
+</div>
+{% endblock %}

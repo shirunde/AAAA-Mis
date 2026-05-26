@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}学生控制台{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-speedometer2"></i> 学生工作台</h4>
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card text-bg-primary"><div class="card-body text-center">
+            <h1>{{ enrolled_count }}</h1><p class="mb-0">已选课程数</p>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-success"><div class="card-body text-center">
+            <h1>{{ "%.2f"|format(gpa|float) if gpa else '0.00' }}</h1><p class="mb-0">平均绩点 (GPA)</p>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-info"><div class="card-body text-center">
+            <h1>{{ total_credits }}</h1><p class="mb-0">已修学分</p>
+        </div></div>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="list-group">
+            <a href="{{ url_for('student.courses') }}" class="list-group-item list-group-item-action"><i class="bi bi-search"></i> 查看可选课程 & 选课</a>
+            <a href="{{ url_for('student.schedule') }}" class="list-group-item list-group-item-action"><i class="bi bi-table"></i> 查看我的课表 & 退课</a>
+            <a href="{{ url_for('student.grades') }}" class="list-group-item list-group-item-action"><i class="bi bi-file-earmark-text"></i> 查看成绩单 & GPA</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

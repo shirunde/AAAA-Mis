@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}学生管理{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-people-fill"></i> 学生管理</h4>
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>ID</th><th>学号</th><th>姓名</th><th>性别</th><th>专业</th><th>班级</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for s in students %}
+        <tr>
+            <td>{{ s.id }}</td><td>{{ s.student_no }}</td><td>{{ s.name }}</td>
+            <td>{{ '男' if s.gender == 'M' else '女' }}</td>
+            <td>{{ s.major_name }}</td><td>{{ s.class_name }}</td>
+            <td>{% if s.is_active %}<span class="badge bg-success">正常</span>{% else %}<span class="badge bg-danger">已禁用</span>{% endif %}</td>
+            <td>
+                <form method="post" action="{{ url_for('admin.students_toggle', sid=s.id) }}" style="display:inline">
+                    <button class="btn btn-sm btn-outline-{{ 'danger' if s.is_active else 'success' }}">
+                        {{ '禁用' if s.is_active else '启用' }}
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

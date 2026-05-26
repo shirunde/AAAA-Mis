@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}课程管理{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-book"></i> 课程信息管理</h4>
+<button class="btn btn-primary btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#addModal">+ 添加课程</button>
+<table class="table table-bordered table-hover">
+    <thead class="table-dark"><tr><th>ID</th><th>课程代码</th><th>课程名称</th><th>学分</th><th>学时</th><th>类型</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for c in courses %}
+        <tr>
+            <td>{{ c.id }}</td><td>{{ c.code }}</td><td>{{ c.name }}</td>
+            <td>{{ c.credit }}</td><td>{{ c.hours }}</td>
+            <td>{% if c.course_type == 'required' %}必修{% elif c.course_type == 'elective' %}选修{% else %}任选{% endif %}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ c.id }}">编辑</button>
+                <form method="post" action="{{ url_for('admin.courses_delete', cid=c.id) }}" style="display:inline" onsubmit="return confirm('确认删除？')">
+                    <button class="btn btn-sm btn-outline-danger">删除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.courses_add') }}">
+            <div class="modal-header"><h5>添加课程</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">课程代码</label><input type="text" name="code" class="form-control" required></div>
+                <div class="mb-3"><label class="form-label">课程名称</label><input type="text" name="name" class="form-control" required></div>
+                <div class="row">
+                    <div class="col-6 mb-3"><label class="form-label">学分</label><input type="number" step="0.5" name="credit" class="form-control" required></div>
+                    <div class="col-6 mb-3"><label class="form-label">学时</label><input type="number" name="hours" class="form-control" required></div>
+                </div>
+                <div class="mb-3"><label class="form-label">课程类型</label>
+                    <select name="course_type" class="form-select"><option value="required">必修</option><option value="elective">选修</option><option value="optional">任选</option></select>
+                </div>
+                <div class="mb-3"><label class="form-label">课程描述</label><textarea name="description" class="form-control" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+
+{% for c in courses %}
+<div class="modal fade" id="editModal{{ c.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.courses_edit', cid=c.id) }}">
+            <div class="modal-header"><h5>编辑课程</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">课程代码</label><input type="text" name="code" class="form-control" value="{{ c.code }}" required></div>
+                <div class="mb-3"><label class="form-label">课程名称</label><input type="text" name="name" class="form-control" value="{{ c.name }}" required></div>
+                <div class="row">
+                    <div class="col-6 mb-3"><label class="form-label">学分</label><input type="number" step="0.5" name="credit" class="form-control" value="{{ c.credit }}" required></div>
+                    <div class="col-6 mb-3"><label class="form-label">学时</label><input type="number" name="hours" class="form-control" value="{{ c.hours }}" required></div>
+                </div>
+                <div class="mb-3"><label class="form-label">课程类型</label>
+                    <select name="course_type" class="form-select">
+                        <option value="required" {% if c.course_type == 'required' %}selected{% endif %}>必修</option>
+                        <option value="elective" {% if c.course_type == 'elective' %}selected{% endif %}>选修</option>
+                        <option value="optional" {% if c.course_type == 'optional' %}selected{% endif %}>任选</option>
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">课程描述</label><textarea name="description" class="form-control" rows="2">{{ c.description or '' }}</textarea></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存修改</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
+{% endblock %}
