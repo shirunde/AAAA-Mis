@@ -6,7 +6,7 @@ USE mis_system;
 
 -- 管理员账户 (密码: admin123)
 INSERT INTO users (username, password_hash, role, is_active) VALUES
-('admin', 'scrypt:32768:8:1$iC2wUoMkfX8dVKzA$e9e63cfb3b2d1bdf6d8d6a5f7d4b3a0c74f9c8e7d6b5a4c3d2e1f7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f', 'admin', 1);
+('admin', 'scrypt:32768:8:1$eB6fXFV2iJvRPokk$5fdf7b98a365e5b841c9fbc9b9798c19563816fc6fe8674baded1e9702bb0c8eefc79250932a7f164b1af0eca5ef75095dbb273607a75833ce80fd268b91544e', 'admin', 1);
 
 -- 学期数据
 INSERT INTO semesters (name, start_date, end_date, is_current) VALUES
