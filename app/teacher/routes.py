@@ -1,8 +1,8 @@
 """教师模块路由"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 from flask_login import login_required, current_user
 from app.decorators import role_required
-from app.db import query, execute, insert
+from app.db import query, execute
 
 teacher_bp = Blueprint('teacher', __name__)
 
@@ -17,6 +17,34 @@ def check_teacher():
 def get_teacher_id():
     t = query('SELECT id FROM teachers WHERE user_id = %s', (current_user['id'],), one=True)
     return t['id'] if t else None
+
+
+def require_offering_owner(oid):
+    tid = get_teacher_id()
+    if not tid:
+        abort(403)
+    row = query(
+        'SELECT id FROM course_offerings WHERE id=%s AND teacher_id=%s',
+        (oid, tid), one=True
+    )
+    if not row:
+        abort(403)
+    return oid
+
+
+def require_enrollment_owner(eid):
+    tid = get_teacher_id()
+    if not tid:
+        abort(403)
+    row = query(
+        """SELECT e.id FROM enrollments e
+           JOIN course_offerings co ON e.course_offering_id = co.id
+           WHERE e.id = %s AND co.teacher_id = %s""",
+        (eid, tid), one=True
+    )
+    if not row:
+        abort(403)
+    return eid
 
 
 @teacher_bp.route('/')
@@ -36,7 +64,6 @@ def dashboard():
     return render_template('teacher/dashboard.html', offerings=my_offerings)
 
 
-# ---- 申请开课 ----
 @teacher_bp.route('/apply-offering', methods=['GET', 'POST'])
 def apply_offering():
     tid = get_teacher_id()
@@ -56,7 +83,6 @@ def apply_offering():
     return render_template('teacher/apply_offering.html', courses=courses, semesters=semesters)
 
 
-# ---- 我的开课列表 ----
 @teacher_bp.route('/my-offerings')
 def my_offerings():
     tid = get_teacher_id()
@@ -74,9 +100,9 @@ def my_offerings():
     return render_template('teacher/my_offerings.html', offerings=data)
 
 
-# ---- 查看选课学生名单 ----
 @teacher_bp.route('/offering/<int:oid>/students')
 def offering_students(oid):
+    require_offering_owner(oid)
     data = query(
         """SELECT e.id AS enrollment_id, s.student_no, s.name, s.gender,
                   m.name AS major_name, c.name AS class_name, e.enrolled_at,
@@ -99,38 +125,51 @@ def offering_students(oid):
     return render_template('teacher/offering_students.html', students=data, offering=offering)
 
 
-# ---- 录入成绩 ----
 @teacher_bp.route('/grade/<int:eid>/edit', methods=['POST'])
 def grade_edit(eid):
+    require_enrollment_owner(eid)
     regular = request.form.get('regular_grade', '').strip()
     exam = request.form.get('exam_grade', '').strip()
 
     regular_val = float(regular) if regular else None
     exam_val = float(exam) if exam else None
+    if regular_val is not None and not (0 <= regular_val <= 100):
+        flash('平时成绩须在 0-100 之间', 'danger')
+        return redirect(request.referrer or url_for('teacher.dashboard'))
+    if exam_val is not None and not (0 <= exam_val <= 100):
+        flash('期末成绩须在 0-100 之间', 'danger')
+        return redirect(request.referrer or url_for('teacher.dashboard'))
 
-    # 直接更新成绩，触发器自动计算总评和绩点
+    locked = query(
+        "SELECT status FROM grades WHERE enrollment_id=%s",
+        (eid,), one=True
+    )
+    if locked and locked['status'] not in ('draft',):
+        flash('成绩已提交，无法修改', 'warning')
+        return redirect(request.referrer or url_for('teacher.dashboard'))
+
     execute(
         """UPDATE grades SET regular_grade=%s, exam_grade=%s WHERE enrollment_id=%s""",
         (regular_val, exam_val, eid)
     )
     flash('成绩保存成功', 'success')
-    return redirect(request.referrer)
+    return redirect(request.referrer or url_for('teacher.dashboard'))
 
 
-# ---- 提交成绩 ----
 @teacher_bp.route('/grade/<int:eid>/submit', methods=['POST'])
 def grade_submit(eid):
+    require_enrollment_owner(eid)
     execute(
         "UPDATE grades SET status='submitted', submitted_at=NOW() WHERE enrollment_id=%s AND status='draft'",
         (eid,)
     )
     flash('成绩已提交，等待管理员审核', 'success')
-    return redirect(request.referrer)
+    return redirect(request.referrer or url_for('teacher.dashboard'))
 
 
-# ---- 批量提交成绩 ----
 @teacher_bp.route('/offering/<int:oid>/submit-all', methods=['POST'])
 def grade_submit_all(oid):
+    require_offering_owner(oid)
     execute(
         """UPDATE grades g
            JOIN enrollments e ON g.enrollment_id = e.id
@@ -143,7 +182,6 @@ def grade_submit_all(oid):
     return redirect(url_for('teacher.offering_students', oid=oid))
 
 
-# ---- 成绩统计 ----
 @teacher_bp.route('/grade-stats')
 def grade_stats():
     tid = get_teacher_id()
@@ -168,6 +206,7 @@ def grade_stats():
 
 @teacher_bp.route('/offering/<int:oid>/stats-data')
 def offering_stats_data(oid):
+    require_offering_owner(oid)
     dist = query(
         """SELECT
              CASE
@@ -198,4 +237,4 @@ def offering_stats_data(oid):
            WHERE e.course_offering_id = %s AND g.total_grade IS NOT NULL""",
         (oid,), one=True
     )
-    return {'distribution': dist, 'stats': stats}
+    return jsonify({'distribution': dist, 'stats': stats})

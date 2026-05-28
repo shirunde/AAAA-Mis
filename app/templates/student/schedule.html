@@ -72,6 +72,7 @@
         <div class="modal-body"><p>确认退选 <strong>{{ s.course_name }}</strong>？</p></div>
         <div class="modal-footer">
             <form method="post" action="{{ url_for('student.drop', oid=s.offering_id) }}">
+                {% include '_csrf_field.html' %}
                 <button type="submit" class="btn btn-danger">确认退课</button>
             </form>
         </div>

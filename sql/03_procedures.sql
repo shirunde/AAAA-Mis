@@ -366,12 +366,14 @@ AFTER UPDATE ON course_offerings
 FOR EACH ROW
 BEGIN
     IF NEW.status != OLD.status THEN
-        INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
-        VALUES (NULL,
-                'course_offering_status_changed',
-                'course_offering',
-                NEW.id,
-                CONCAT('状态变更: ', OLD.status, ' -> ', NEW.status));
+        IF NOT (OLD.status = 'pending' AND NEW.status IN ('approved', 'rejected')) THEN
+            INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
+            VALUES (NULL,
+                    'course_offering_status_changed',
+                    'course_offering',
+                    NEW.id,
+                    CONCAT('状态变更: ', OLD.status, ' -> ', NEW.status));
+        END IF;
     END IF;
 END //
 

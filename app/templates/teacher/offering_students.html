@@ -7,6 +7,7 @@
 </h4>
 <a href="{{ url_for('teacher.my_offerings') }}" class="btn btn-sm btn-outline-secondary mb-3">&larr; 返回</a>
 <form method="post" action="{{ url_for('teacher.grade_submit_all', oid=offering.id) }}" class="d-inline">
+    {% include '_csrf_field.html' %}
     <button class="btn btn-sm btn-warning mb-3" onclick="return confirm('确认批量提交所有已录入分数？')">批量提交成绩</button>
 </form>
 
@@ -31,6 +32,7 @@
                 </button>
                 {% if s.grade_status == 'draft' and s.regular_grade is not none and s.exam_grade is not none %}
                 <form method="post" action="{{ url_for('teacher.grade_submit', eid=s.enrollment_id) }}" style="display:inline">
+                    {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-warning">提交</button>
                 </form>
                 {% endif %}
@@ -44,6 +46,7 @@
 <div class="modal fade" id="gradeModal{{ s.enrollment_id }}" tabindex="-1">
     <div class="modal-dialog modal-sm"><div class="modal-content">
         <form method="post" action="{{ url_for('teacher.grade_edit', eid=s.enrollment_id) }}">
+            {% include '_csrf_field.html' %}
             <div class="modal-header"><h5>录入成绩 - {{ s.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="mb-3"><label class="form-label">平时成绩 (0-100)</label>

@@ -26,7 +26,7 @@ mysql -u root -p < sql/02_seed.sql
 ```
 
 ### 3. 修改配置
-编辑 `config.py`，修改数据库连接参数（主机、端口、用户名、密码）。
+复制 `.env.example` 为 `.env` 并修改数据库连接参数；或直接编辑 `config.py`。
 
 ### 4. 启动应用
 ```bash

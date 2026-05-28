@@ -11,6 +11,7 @@
             <td>
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ c.id }}">编辑</button>
                 <form method="post" action="{{ url_for('admin.classes_delete', cid=c.id) }}" style="display:inline" onsubmit="return confirm('确认删除？')">
+                    {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-danger">删除</button>
                 </form>
             </td>
@@ -22,6 +23,7 @@
 <div class="modal fade" id="addModal" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content">
         <form method="post" action="{{ url_for('admin.classes_add') }}">
+            {% include '_csrf_field.html' %}
             <div class="modal-header"><h5 class="modal-title">添加班级</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="mb-3"><label class="form-label">班级名称</label><input type="text" name="name" class="form-control" required></div>
@@ -40,6 +42,7 @@
 <div class="modal fade" id="editModal{{ c.id }}" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content">
         <form method="post" action="{{ url_for('admin.classes_edit', cid=c.id) }}">
+            {% include '_csrf_field.html' %}
             <div class="modal-header"><h5 class="modal-title">编辑班级</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="mb-3"><label class="form-label">班级名称</label><input type="text" name="name" class="form-control" value="{{ c.name }}" required></div>

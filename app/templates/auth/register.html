@@ -7,6 +7,7 @@
             <div class="card-body p-4">
                 <h3 class="text-center mb-4">用户注册</h3>
                 <form method="post" id="registerForm">
+                    {% include '_csrf_field.html' %}
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">用户名</label>
@@ -79,16 +80,15 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
-// Toggle student fields visibility
 document.getElementById('roleSelect').addEventListener('change', function() {
     document.getElementById('studentFields').style.display = this.value === 'student' ? '' : 'none';
 });
 document.getElementById('roleSelect').dispatchEvent(new Event('change'));
 
-// Cascade: major -> class filter
 document.getElementById('majorSelect').addEventListener('change', function() {
     var majorId = this.value;
     document.querySelectorAll('#classSelect option').forEach(function(opt) {
@@ -98,5 +98,4 @@ document.getElementById('majorSelect').addEventListener('change', function() {
     document.getElementById('classSelect').value = '';
 });
 </script>
-{% endblock %}
 {% endblock %}

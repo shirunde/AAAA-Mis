@@ -20,6 +20,7 @@
     </div>
 </div>
 {% else %}<p class="text-muted">暂无开课记录</p>{% endfor %}
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -37,13 +38,12 @@ fetch('{{ url_for("teacher.offering_stats_data", oid=o.id) }}')
             document.getElementById('stats{{ o.id }}').innerHTML = `
                 <table class="table table-sm"><tbody>
                     <tr><td>总人数</td><td><strong>${s.total}</strong></td></tr>
-                    <tr><td>平均分</td><td><strong>${s.avg_grade}</strong></td></tr>
-                    <tr><td>最高分</td><td>${s.max_grade}</td></tr>
-                    <tr><td>最低分</td><td>${s.min_grade}</td></tr>
-                    <tr><td>及格率</td><td><strong>${s.pass_rate}%</strong></td></tr>
+                    <tr><td>平均分</td><td><strong>${s.avg_grade != null ? s.avg_grade : '-'}</strong></td></tr>
+                    <tr><td>最高分</td><td>${s.max_grade != null ? s.max_grade : '-'}</td></tr>
+                    <tr><td>最低分</td><td>${s.min_grade != null ? s.min_grade : '-'}</td></tr>
+                    <tr><td>及格率</td><td><strong>${s.pass_rate != null ? s.pass_rate + '%' : '-'}</strong></td></tr>
                 </tbody></table>`; }
     });
 {% endfor %}
 </script>
-{% endblock %}
 {% endblock %}

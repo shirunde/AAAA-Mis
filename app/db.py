@@ -59,13 +59,15 @@ def execute(sql, args=None):
         return rows
 
 
-def call_proc(name, args=None):
-    """调用存储过程，返回 OUT 参数"""
+def call_proc(proc_name, args, out_indices):
+    """调用存储过程并读取 OUT 参数，out_indices 为 OUT 参数在 callproc 中的下标列表"""
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.callproc(name, args)
+        cur.callproc(proc_name, args)
         conn.commit()
-        return cur.fetchall()
+        selects = ', '.join(f'@_{proc_name}_{i} AS p{i}' for i in out_indices)
+        cur.execute(f'SELECT {selects}')
+        return cur.fetchone()
 
 
 def insert(sql, args=None):

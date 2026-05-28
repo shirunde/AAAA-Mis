@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.decorators import role_required
-from app.db import query, execute, insert, paginate
+from app.db import query, execute, insert, paginate, call_proc
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -202,9 +202,10 @@ def students_toggle(sid):
 
 @admin_bp.route('/students/<int:sid>/edit', methods=['POST'])
 def students_edit(sid):
-    execute('UPDATE students SET major_id=%s, class_id=%s, phone=%s, email=%s WHERE id=%s',
+    execute('UPDATE students SET major_id=%s, class_id=%s, phone=%s, email=%s, status=%s WHERE id=%s',
             (request.form['major_id'], request.form['class_id'],
-             request.form.get('phone', ''), request.form.get('email', ''), sid))
+             request.form.get('phone', ''), request.form.get('email', ''),
+             request.form.get('status', 'active'), sid))
     flash('学生信息更新成功', 'success')
     return redirect(url_for('admin.students'))
 
@@ -236,6 +237,15 @@ def teachers_toggle(tid):
     return redirect(url_for('admin.teachers'))
 
 
+@admin_bp.route('/teachers/<int:tid>/edit', methods=['POST'])
+def teachers_edit(tid):
+    execute('UPDATE teachers SET title=%s, phone=%s, email=%s WHERE id=%s',
+            (request.form.get('title', ''), request.form.get('phone', ''),
+             request.form.get('email', ''), tid))
+    flash('教师信息更新成功', 'success')
+    return redirect(url_for('admin.teachers'))
+
+
 # ---- 开课审核 (分页) ----
 @admin_bp.route('/offerings')
 def offerings():
@@ -255,12 +265,19 @@ def offerings():
 def offerings_review(oid):
     action = request.form['action']
     comment = request.form.get('comment', '')
-    execute("""UPDATE course_offerings SET status=%s,review_comment=%s,reviewed_at=NOW()
-               WHERE id=%s AND status='pending'""", (action, comment, oid))
-    execute("""INSERT INTO system_logs (user_id,action,target_type,target_id,detail)
-               VALUES (%s,%s,'course_offering',%s,%s)""",
-            (current_user['id'], f'course_offering_{action}', oid, f'审核意见: {comment}'))
-    flash(f'开课申请已{("通过" if action=="approved" else "驳回")}', 'success')
+    if action not in ('approved', 'rejected'):
+        flash('无效的审核操作', 'danger')
+        return redirect(url_for('admin.offerings'))
+
+    try:
+        out = call_proc('sp_approve_course_offering',
+                        (oid, current_user['id'], action, comment, 0, ''), [4, 5])
+        if out['p4'] == 0:
+            flash(f'开课申请已{("通过" if action == "approved" else "驳回")}', 'success')
+        else:
+            flash(out['p5'], 'warning')
+    except Exception as e:
+        flash(f'审核失败：{str(e)}', 'danger')
     return redirect(url_for('admin.offerings'))
 
 
@@ -287,6 +304,18 @@ def selection_periods_add():
             (request.form['semester_id'], request.form['name'],
              request.form['start_time'], request.form['end_time'], request.form['period_type']))
     flash('选课时间段添加成功', 'success')
+    return redirect(url_for('admin.selection_periods'))
+
+
+@admin_bp.route('/selection-periods/<int:pid>/edit', methods=['POST'])
+def selection_periods_edit(pid):
+    execute("""UPDATE course_selection_periods
+               SET semester_id=%s, name=%s, start_time=%s, end_time=%s, period_type=%s
+               WHERE id=%s""",
+            (request.form['semester_id'], request.form['name'],
+             request.form['start_time'], request.form['end_time'],
+             request.form['period_type'], pid))
+    flash('选课时间段更新成功', 'success')
     return redirect(url_for('admin.selection_periods'))
 
 
@@ -366,12 +395,11 @@ def logs():
 # ---- 统计分析 ----
 @admin_bp.route('/statistics')
 def statistics():
-    selection_stats = query("""SELECT c.code, c.name AS course_name, t.name AS teacher_name,
-        co.max_students, COUNT(CASE WHEN e.status='enrolled' THEN 1 END) AS enrolled_count
-        FROM course_offerings co JOIN courses c ON co.course_id=c.id
-        JOIN teachers t ON co.teacher_id=t.id
-        LEFT JOIN enrollments e ON co.id=e.course_offering_id
-        GROUP BY co.id,c.code,c.name,t.name,co.max_students ORDER BY enrolled_count DESC""")
+    selection_stats = query("""SELECT course_code AS code, course_name, teacher_name,
+        max_students, enrolled_count
+        FROM v_course_selection_stats
+        WHERE offering_status IN ('approved', 'published')
+        ORDER BY enrolled_count DESC""")
 
     grade_dist = query("""SELECT CASE
         WHEN g.total_grade>=90 THEN '90-100(优秀)'
@@ -382,12 +410,12 @@ def statistics():
         FROM grades g WHERE g.total_grade IS NOT NULL
         GROUP BY grade_range ORDER BY grade_range DESC""")
 
-    teacher_workload = query("""SELECT t.name, t.title,
-        COUNT(DISTINCT co.id) AS offering_count,
-        COALESCE(SUM(CASE WHEN e.status='enrolled' THEN 1 ELSE 0 END),0) AS total_students
-        FROM teachers t LEFT JOIN course_offerings co ON t.id=co.teacher_id
-        LEFT JOIN enrollments e ON co.id=e.course_offering_id
-        GROUP BY t.id,t.name,t.title ORDER BY offering_count DESC""")
+    teacher_workload = query("""SELECT teacher_name AS name, title,
+        SUM(total_offerings) AS offering_count,
+        SUM(total_students) AS total_students
+        FROM v_teacher_workload
+        GROUP BY teacher_id, teacher_name, title
+        ORDER BY offering_count DESC""")
 
     return render_template('admin/statistics.html',
                            selection_stats=selection_stats, grade_dist=grade_dist,

@@ -1,5 +1,6 @@
 flask>=3.0
 flask-login>=0.6
+flask-wtf>=1.2
 pymysql>=1.1
 dbutils>=3.1
 werkzeug>=3.0

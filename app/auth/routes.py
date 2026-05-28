@@ -1,10 +1,30 @@
 """认证模块路由：登录/注册/个人信息"""
+from datetime import datetime
+import random
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.db import query, execute, insert
 from app.auth.forms import LoginForm, RegisterForm
 from app import User
+
+
+def _unique_student_no():
+    year = datetime.now().year
+    for _ in range(20):
+        no = f'{year}{random.randint(100000, 999999)}'
+        if not query('SELECT id FROM students WHERE student_no=%s', (no,), one=True):
+            return no
+    return None
+
+
+def _unique_teacher_no():
+    for _ in range(20):
+        no = f'T{random.randint(10000, 99999)}'
+        if not query('SELECT id FROM teachers WHERE teacher_no=%s', (no,), one=True):
+            return no
+    return None
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -60,17 +80,22 @@ def register():
 
             role_name = form.role.data
             if role_name == 'student':
-                import random
-                student_no = f"2023{random.randint(100000, 999999)}"
+                student_no = _unique_student_no()
+                if not student_no:
+                    flash('学号生成失败，请稍后重试', 'danger')
+                    return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+                enrollment_year = datetime.now().year
                 insert(
                     """INSERT INTO students (user_id,student_no,name,gender,major_id,class_id,enrollment_year,phone,email)
-                       VALUES (%s,%s,%s,%s,%s,%s,2023,%s,%s)""",
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (user_id, student_no, form.name.data, form.gender.data,
                      form.major_id.data or 1, form.class_id.data or 1,
-                     form.phone.data, form.email.data))
+                     enrollment_year, form.phone.data, form.email.data))
             else:
-                import random
-                teacher_no = f"T{random.randint(10000, 99999)}"
+                teacher_no = _unique_teacher_no()
+                if not teacher_no:
+                    flash('工号生成失败，请稍后重试', 'danger')
+                    return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
                 insert(
                     """INSERT INTO teachers (user_id,teacher_no,name,gender,phone,email)
                        VALUES (%s,%s,%s,%s,%s,%s)""",

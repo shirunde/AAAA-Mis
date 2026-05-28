@@ -5,6 +5,7 @@
 <div class="col-md-8">
     <div class="card"><div class="card-body">
         <form method="post">
+            {% include '_csrf_field.html' %}
             <div class="row mb-3">
                 <div class="col-6"><label class="form-label">课程</label>
                     <select name="course_id" class="form-select" required>

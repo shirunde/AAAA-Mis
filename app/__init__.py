@@ -1,7 +1,10 @@
 """Flask 应用初始化 & 蓝图注册"""
 from flask import Flask
 from flask_login import LoginManager, UserMixin
+from flask_wtf.csrf import CSRFProtect
 from config import Config
+
+csrf = CSRFProtect()
 
 
 class User(UserMixin):
@@ -26,6 +29,8 @@ class User(UserMixin):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    csrf.init_app(app)
 
     # Init database pool
     from app.db import init_pool, close_conn
@@ -69,6 +74,11 @@ def create_app():
         return redirect(url_for(f'{role}.dashboard'))
 
     # Error handlers
+    @app.errorhandler(403)
+    def forbidden(e):
+        from flask import render_template
+        return render_template('403.html'), 403
+
     @app.errorhandler(404)
     def not_found(e):
         from flask import render_template

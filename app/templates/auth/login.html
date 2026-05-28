@@ -9,6 +9,7 @@
                     <i class="bi bi-mortarboard-fill text-primary"></i> 教务管理系统
                 </h3>
                 <form method="post">
+                    {% include '_csrf_field.html' %}
                     <div class="mb-3">
                         <label class="form-label">用户名</label>
                         <input type="text" name="username" class="form-control" required
