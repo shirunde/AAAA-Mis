@@ -14,11 +14,16 @@
 <div class="row g-3">
     {% for o in items %}
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 offering-card" data-oid="{{ o.id }}">
+        <div class="card h-100 offering-card {% if o.schedule and o.schedule in conflict_schedules and o.id not in enrolled_ids %}border-warning{% endif %}" data-oid="{{ o.id }}">
             <div class="card-body">
                 <h6 class="card-title">{{ o.course_name }} <small class="text-muted">({{ o.course_code }})</small></h6>
                 <p class="card-text small mb-1">教师: {{ o.teacher_name }}{% if o.title %}({{ o.title }}){% endif %} | 学分: {{ o.credit }}</p>
-                <p class="card-text small mb-1">{{ o.schedule or '待定' }} | {{ o.classroom or '待定' }}</p>
+                <p class="card-text small mb-1">
+                    {{ o.schedule or '待定' }} | {{ o.classroom or '待定' }}
+                    {% if o.schedule and o.schedule in conflict_schedules and o.id not in enrolled_ids %}
+                    <span class="badge bg-warning text-dark ms-1" title="与你已选课程时间冲突">时间冲突</span>
+                    {% endif %}
+                </p>
                 <p class="card-text small mb-2">
                     {% if o.course_type=='required' %}<span class="badge bg-danger">必修</span>
                     {% elif o.course_type=='elective' %}<span class="badge bg-info">选修</span>
@@ -38,7 +43,7 @@
                 {% if o.id in enrolled_ids %}
                 <span class="btn btn-sm btn-success disabled flex-grow-1">已选</span>
                 {% else %}
-                <form method="post" action="{{ url_for('student.enroll', oid=o.id) }}" class="flex-grow-1" onsubmit="return confirm('确认选择该课程？')">
+                <form method="post" action="{{ url_for('student.enroll', oid=o.id) }}" class="flex-grow-1" onsubmit="return confirm('{% if o.schedule and o.schedule in conflict_schedules %}该课程与你已选课程时间冲突，确定选择？{% else %}确认选择该课程？{% endif %}')">
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-primary w-100" {% if o.enrolled_count>=o.max_students %}disabled{% endif %}>
                         {% if o.enrolled_count>=o.max_students %}已满{% else %}选课{% endif %}</button>

@@ -2,10 +2,13 @@
 {% block title %}教师管理{% endblock %}{% block page_title %}教师管理{% endblock %}
 {% block content %}
 <div class="card"><div class="card-body">
-<form method="get" class="row g-2 mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<form method="get" class="row g-2 flex-grow-1">
     <div class="col-md-4"><input type="text" name="search" class="form-control" placeholder="搜索姓名/工号/用户名" value="{{ search }}"></div>
     <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">搜索</button></div>
 </form>
+<button class="btn btn-success ms-2" data-bs-toggle="modal" data-bs-target="#addTeacherModal">添加教师</button>
+</div>
 <div class="table-responsive">
 <table class="table table-bordered table-hover">
     <thead class="table-dark"><tr><th>ID</th><th>工号</th><th>姓名</th><th>性别</th><th>职称</th><th>状态</th><th>操作</th></tr></thead>
@@ -16,6 +19,7 @@
             <td>{% if t.is_active %}<span class="badge bg-success">正常</span>{% else %}<span class="badge bg-danger">禁用</span>{% endif %}</td>
             <td nowrap>
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ t.id }}">编辑</button>
+                <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPwdModal{{ t.id }}">重置密码</button>
                 <form method="post" action="{{ url_for('admin.teachers_toggle', tid=t.id) }}" style="display:inline">
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-{{ 'danger' if t.is_active else 'success' }}">{{ '禁用' if t.is_active else '启用' }}</button>
@@ -28,7 +32,31 @@
 {% include "_pagination.html" %}
 </div></div>
 
+<!-- 添加教师 Modal -->
+<div class="modal fade" id="addTeacherModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.teachers_add') }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>添加教师</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label class="form-label">用户名 *</label><input type="text" name="username" class="form-control" required></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">密码 *</label><input type="text" name="password" class="form-control" required></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">姓名 *</label><input type="text" name="name" class="form-control" required></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">性别 *</label>
+                        <select name="gender" class="form-select"><option value="M">男</option><option value="F">女</option></select></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">职称</label><input type="text" name="title" class="form-control" placeholder="如：副教授"></div>
+                    <div class="col-md-3 mb-3"><label class="form-label">电话</label><input type="text" name="phone" class="form-control"></div>
+                    <div class="col-md-3 mb-3"><label class="form-label">邮箱</label><input type="email" name="email" class="form-control"></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-success">添加</button></div>
+        </form>
+    </div></div>
+</div>
+
 {% for t in items %}
+<!-- 编辑 Modal -->
 <div class="modal fade" id="editModal{{ t.id }}" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content">
         <form method="post" action="{{ url_for('admin.teachers_edit', tid=t.id) }}">
@@ -42,6 +70,20 @@
                 <div class="mb-3"><label class="form-label">邮箱</label><input type="email" name="email" class="form-control" value="{{ t.email or '' }}"></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+
+<!-- 重置密码 Modal -->
+<div class="modal fade" id="resetPwdModal{{ t.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.teachers_reset_password', tid=t.id) }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>重置密码 - {{ t.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">新密码（至少6位）</label><input type="text" name="new_password" class="form-control" required minlength="6"></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-warning">重置</button></div>
         </form>
     </div></div>
 </div>

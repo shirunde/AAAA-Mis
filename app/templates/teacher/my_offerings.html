@@ -13,11 +13,49 @@
                 {% elif o.status=='approved' %}<span class="badge bg-info">已通过</span>
                 {% elif o.status=='published' %}<span class="badge bg-success">已发布</span>
                 {% else %}<span class="badge bg-danger">已驳回</span>{% endif %}</td>
-            <td>
+            <td nowrap>
+                {% if o.status=='pending' %}
+                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editOfferingModal{{ o.id }}">编辑</button>
+                <form method="post" action="{{ url_for('teacher.withdraw_offering', oid=o.id) }}" style="display:inline" onsubmit="return confirm('确认撤销该开课申请？')">
+                    {% include '_csrf_field.html' %}
+                    <button class="btn btn-sm btn-outline-danger">撤销</button>
+                </form>
+                {% endif %}
                 <a href="{{ url_for('teacher.offering_students', oid=o.id) }}" class="btn btn-sm btn-outline-primary">学生名单</a>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+{% for o in offerings %}
+{% if o.status=='pending' %}
+<!-- 编辑开课 Modal -->
+<div class="modal fade" id="editOfferingModal{{ o.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('teacher.edit_offering', oid=o.id) }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>编辑开课申请</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">课程</label>
+                    <select name="course_id" class="form-select">
+                        {% for c in courses %}<option value="{{ c.id }}" {% if c.id==o.course_id %}selected{% endif %}>{{ c.name }} ({{ c.code }})</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">学期</label>
+                    <select name="semester_id" class="form-select">
+                        {% for s in semesters %}<option value="{{ s.id }}" {% if s.id==o.semester_id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">人数上限</label><input type="number" name="max_students" class="form-control" value="{{ o.max_students }}" required></div>
+                <div class="mb-3"><label class="form-label">教室</label><input type="text" name="classroom" class="form-control" value="{{ o.classroom or '' }}"></div>
+                <div class="mb-3"><label class="form-label">上课时间</label><input type="text" name="schedule" class="form-control" value="{{ o.schedule or '' }}"></div>
+                <div class="mb-3"><label class="form-label">申请理由</label><textarea name="apply_reason" class="form-control" rows="2">{{ o.apply_reason or '' }}</textarea></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+{% endif %}
+{% endfor %}
 {% endblock %}

@@ -97,7 +97,37 @@ def my_offerings():
            ORDER BY co.created_at DESC""",
         (tid,)
     )
-    return render_template('teacher/my_offerings.html', offerings=data)
+    courses = query('SELECT * FROM courses ORDER BY id')
+    semesters = query('SELECT * FROM semesters ORDER BY id DESC')
+    return render_template('teacher/my_offerings.html', offerings=data, courses=courses, semesters=semesters)
+
+
+@teacher_bp.route('/offering/<int:oid>/withdraw', methods=['POST'])
+def withdraw_offering(oid):
+    require_offering_owner(oid)
+    o = query('SELECT status FROM course_offerings WHERE id=%s', (oid,), one=True)
+    if not o or o['status'] != 'pending':
+        flash('只能撤销待审核的申请', 'warning')
+        return redirect(url_for('teacher.my_offerings'))
+    execute('DELETE FROM course_offerings WHERE id=%s AND status=%s', (oid, 'pending'))
+    flash('开课申请已撤销', 'success')
+    return redirect(url_for('teacher.my_offerings'))
+
+
+@teacher_bp.route('/offering/<int:oid>/edit', methods=['POST'])
+def edit_offering(oid):
+    require_offering_owner(oid)
+    o = query('SELECT status FROM course_offerings WHERE id=%s', (oid,), one=True)
+    if not o or o['status'] != 'pending':
+        flash('只能编辑待审核的申请', 'warning')
+        return redirect(url_for('teacher.my_offerings'))
+    execute("""UPDATE course_offerings SET course_id=%s, semester_id=%s, max_students=%s,
+               classroom=%s, schedule=%s, apply_reason=%s WHERE id=%s AND status='pending'""",
+            (request.form['course_id'], request.form['semester_id'],
+             request.form['max_students'], request.form.get('classroom', ''),
+             request.form.get('schedule', ''), request.form.get('apply_reason', ''), oid))
+    flash('开课申请已更新', 'success')
+    return redirect(url_for('teacher.my_offerings'))
 
 
 @teacher_bp.route('/offering/<int:oid>/students')

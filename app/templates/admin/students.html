@@ -2,10 +2,13 @@
 {% block title %}学生管理{% endblock %}{% block page_title %}学生管理{% endblock %}
 {% block content %}
 <div class="card"><div class="card-body">
-<form method="get" class="row g-2 mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<form method="get" class="row g-2 flex-grow-1">
     <div class="col-md-4"><input type="text" name="search" class="form-control" placeholder="搜索姓名/学号/用户名" value="{{ search }}"></div>
     <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">搜索</button></div>
 </form>
+<button class="btn btn-success ms-2" data-bs-toggle="modal" data-bs-target="#addStudentModal">添加学生</button>
+</div>
 <div class="table-responsive">
 <table class="table table-bordered table-hover">
     <thead class="table-dark"><tr><th>ID</th><th>学号</th><th>姓名</th><th>性别</th><th>专业</th><th>班级</th><th>学籍</th><th>账号</th><th>操作</th></tr></thead>
@@ -19,6 +22,7 @@
             <td>{% if s.is_active %}<span class="badge bg-success">正常</span>{% else %}<span class="badge bg-danger">禁用</span>{% endif %}</td>
             <td nowrap>
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ s.id }}">编辑</button>
+                <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPwdModal{{ s.id }}">重置密码</button>
                 <form method="post" action="{{ url_for('admin.students_toggle', sid=s.id) }}" style="display:inline">
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-{{ 'danger' if s.is_active else 'success' }}">{{ '禁用' if s.is_active else '启用' }}</button>
@@ -31,7 +35,39 @@
 {% include "_pagination.html" %}
 </div></div>
 
+<!-- 添加学生 Modal -->
+<div class="modal fade" id="addStudentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.students_add') }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>添加学生</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label class="form-label">用户名 *</label><input type="text" name="username" class="form-control" required></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">密码 *</label><input type="text" name="password" class="form-control" required></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">姓名 *</label><input type="text" name="name" class="form-control" required></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">性别 *</label>
+                        <select name="gender" class="form-select"><option value="M">男</option><option value="F">女</option></select></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">专业 *</label>
+                        <select name="major_id" class="form-select">
+                            {% for m in majors %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+                        </select></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">班级 *</label>
+                        <select name="class_id" class="form-select">
+                            {% for c in all_classes %}<option value="{{ c.id }}">{{ c.name }} ({{ c.grade }})</option>{% endfor %}
+                        </select></div>
+                    <div class="col-md-4 mb-3"><label class="form-label">入学年份</label><input type="number" name="enrollment_year" class="form-control" value="2023"></div>
+                    <div class="col-md-4 mb-3"><label class="form-label">电话</label><input type="text" name="phone" class="form-control"></div>
+                    <div class="col-md-4 mb-3"><label class="form-label">邮箱</label><input type="email" name="email" class="form-control"></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-success">添加</button></div>
+        </form>
+    </div></div>
+</div>
+
 {% for s in items %}
+<!-- 编辑 Modal -->
 <div class="modal fade" id="editModal{{ s.id }}" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content">
         <form method="post" action="{{ url_for('admin.students_edit', sid=s.id) }}">
@@ -59,6 +95,20 @@
                 <div class="mb-3"><label class="form-label">邮箱</label><input type="email" name="email" class="form-control" value="{{ s.email or '' }}"></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
+        </form>
+    </div></div>
+</div>
+
+<!-- 重置密码 Modal -->
+<div class="modal fade" id="resetPwdModal{{ s.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.students_reset_password', sid=s.id) }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>重置密码 - {{ s.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">新密码（至少6位）</label><input type="text" name="new_password" class="form-control" required minlength="6"></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-warning">重置</button></div>
         </form>
     </div></div>
 </div>

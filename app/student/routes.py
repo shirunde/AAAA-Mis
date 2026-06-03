@@ -90,13 +90,19 @@ def courses():
     data = paginate(_COURSE_SQL + where_extra + ' ORDER BY co.id DESC', tuple(args), page=page)
 
     enrolled_ids = set()
+    conflict_schedules = set()
     if sid:
         rows = query('SELECT course_offering_id FROM enrollments WHERE student_id=%s AND status=%s',
                      (sid, 'enrolled'))
         enrolled_ids = {r['course_offering_id'] for r in rows}
+        schedules = query("""SELECT co.schedule FROM enrollments e
+                             JOIN course_offerings co ON e.course_offering_id = co.id
+                             WHERE e.student_id = %s AND e.status = 'enrolled'
+                               AND co.schedule IS NOT NULL AND co.schedule != ''""", (sid,))
+        conflict_schedules = {s['schedule'] for s in schedules}
 
     return render_template('student/courses.html', **data, search=search, type=course_type,
-                           enrolled_ids=enrolled_ids)
+                           enrolled_ids=enrolled_ids, conflict_schedules=conflict_schedules)
 
 
 @student_bp.route('/course/<int:oid>/detail')

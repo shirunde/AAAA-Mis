@@ -1,8 +1,11 @@
 """管理员模块路由"""
+import random
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
+from werkzeug.security import generate_password_hash
 from app.decorators import role_required
-from app.db import query, execute, insert, paginate, call_proc
+from app.db import query, execute, insert, paginate, call_proc, get_conn
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -210,6 +213,52 @@ def students_edit(sid):
     return redirect(url_for('admin.students'))
 
 
+@admin_bp.route('/students/add', methods=['POST'])
+def students_add():
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute('SELECT id FROM users WHERE username=%s', (request.form['username'],))
+            if cur.fetchone():
+                flash('用户名已存在', 'danger')
+                return redirect(url_for('admin.students'))
+
+            password_hash = generate_password_hash(request.form['password'])
+            cur.execute('INSERT INTO users (username, password_hash, role) VALUES (%s,%s,%s)',
+                        (request.form['username'], password_hash, 'student'))
+            user_id = cur.lastrowid
+
+            student_no = f"{request.form.get('enrollment_year', 2023)}{random.randint(100000, 999999)}"
+            cur.execute("""INSERT INTO students (user_id, student_no, name, gender, major_id, class_id,
+                           enrollment_year, phone, email)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (user_id, student_no, request.form['name'], request.form['gender'],
+                         request.form['major_id'], request.form['class_id'],
+                         request.form.get('enrollment_year', 2023),
+                         request.form.get('phone', ''), request.form.get('email', '')))
+            conn.commit()
+        flash('学生添加成功', 'success')
+    except Exception as e:
+        flash(f'添加失败：{str(e)}', 'danger')
+    return redirect(url_for('admin.students'))
+
+
+@admin_bp.route('/students/<int:sid>/reset-password', methods=['POST'])
+def students_reset_password(sid):
+    new_password = request.form.get('new_password', '').strip()
+    if not new_password or len(new_password) < 6:
+        flash('密码至少6位', 'danger')
+        return redirect(url_for('admin.students'))
+    s = query('SELECT user_id FROM students WHERE id=%s', (sid,), one=True)
+    if s:
+        execute('UPDATE users SET password_hash=%s WHERE id=%s',
+                (generate_password_hash(new_password), s['user_id']))
+        flash('密码已重置', 'success')
+    else:
+        flash('学生不存在', 'danger')
+    return redirect(url_for('admin.students'))
+
+
 # ---- 教师管理 (分页+搜索) ----
 @admin_bp.route('/teachers')
 def teachers():
@@ -243,6 +292,50 @@ def teachers_edit(tid):
             (request.form.get('title', ''), request.form.get('phone', ''),
              request.form.get('email', ''), tid))
     flash('教师信息更新成功', 'success')
+    return redirect(url_for('admin.teachers'))
+
+
+@admin_bp.route('/teachers/add', methods=['POST'])
+def teachers_add():
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute('SELECT id FROM users WHERE username=%s', (request.form['username'],))
+            if cur.fetchone():
+                flash('用户名已存在', 'danger')
+                return redirect(url_for('admin.teachers'))
+
+            password_hash = generate_password_hash(request.form['password'])
+            cur.execute('INSERT INTO users (username, password_hash, role) VALUES (%s,%s,%s)',
+                        (request.form['username'], password_hash, 'teacher'))
+            user_id = cur.lastrowid
+
+            teacher_no = f"T{random.randint(10000, 99999)}"
+            cur.execute("""INSERT INTO teachers (user_id, teacher_no, name, gender, title, phone, email)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                        (user_id, teacher_no, request.form['name'], request.form['gender'],
+                         request.form.get('title', ''), request.form.get('phone', ''),
+                         request.form.get('email', '')))
+            conn.commit()
+        flash('教师添加成功', 'success')
+    except Exception as e:
+        flash(f'添加失败：{str(e)}', 'danger')
+    return redirect(url_for('admin.teachers'))
+
+
+@admin_bp.route('/teachers/<int:tid>/reset-password', methods=['POST'])
+def teachers_reset_password(tid):
+    new_password = request.form.get('new_password', '').strip()
+    if not new_password or len(new_password) < 6:
+        flash('密码至少6位', 'danger')
+        return redirect(url_for('admin.teachers'))
+    t = query('SELECT user_id FROM teachers WHERE id=%s', (tid,), one=True)
+    if t:
+        execute('UPDATE users SET password_hash=%s WHERE id=%s',
+                (generate_password_hash(new_password), t['user_id']))
+        flash('密码已重置', 'success')
+    else:
+        flash('教师不存在', 'danger')
     return redirect(url_for('admin.teachers'))
 
 
@@ -355,22 +448,57 @@ def grades_review():
 
 @admin_bp.route('/grades/<int:gid>/approve', methods=['POST'])
 def grades_approve(gid):
-    execute("UPDATE grades SET status='approved',approved_at=NOW() WHERE id=%s AND status='submitted'", (gid,))
-    flash('成绩已审核通过', 'success')
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("UPDATE grades SET status='approved',approved_at=NOW() WHERE id=%s AND status='submitted'", (gid,))
+            if cur.rowcount == 0:
+                flash('该成绩不存在或已审核', 'warning')
+                return redirect(url_for('admin.grades_review'))
+            cur.execute("""INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
+                           VALUES (%s, 'grade_approved', 'grade', %s, '管理员审核通过成绩')""",
+                        (current_user['id'], gid))
+            conn.commit()
+        flash('成绩已审核通过', 'success')
+    except Exception as e:
+        flash(f'审核失败：{str(e)}', 'danger')
     return redirect(url_for('admin.grades_review'))
 
 
 @admin_bp.route('/grades/<int:gid>/publish', methods=['POST'])
 def grades_publish(gid):
-    execute("UPDATE grades SET status='published',published_at=NOW() WHERE id=%s AND status='approved'", (gid,))
-    flash('成绩已发布', 'success')
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("UPDATE grades SET status='published',published_at=NOW() WHERE id=%s AND status='approved'", (gid,))
+            if cur.rowcount == 0:
+                flash('该成绩不存在或未通过审核', 'warning')
+                return redirect(url_for('admin.grades_review'))
+            cur.execute("""INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
+                           VALUES (%s, 'grade_published', 'grade', %s, '管理员发布成绩')""",
+                        (current_user['id'], gid))
+            conn.commit()
+        flash('成绩已发布', 'success')
+    except Exception as e:
+        flash(f'发布失败：{str(e)}', 'danger')
     return redirect(url_for('admin.grades_review'))
 
 
 @admin_bp.route('/grades/batch-publish', methods=['POST'])
 def grades_batch_publish():
-    execute("UPDATE grades SET status='published',published_at=NOW() WHERE status='approved'")
-    flash('已批量发布所有审核通过的成绩', 'success')
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("UPDATE grades SET status='published',published_at=NOW() WHERE status='approved'")
+            count = cur.rowcount
+            if count > 0:
+                cur.execute("""INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
+                               VALUES (%s, 'grade_batch_published', 'grade', 0, %s)""",
+                            (current_user['id'], f'批量发布{count}条成绩'))
+            conn.commit()
+        flash(f'已批量发布{count}条成绩', 'success')
+    except Exception as e:
+        flash(f'批量发布失败：{str(e)}', 'danger')
     return redirect(url_for('admin.grades_review'))
 
 
