@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app.decorators import role_required
-from app.db import query, execute, paginate, call_proc
+from app.db import query, execute, paginate, call_proc, call_proc_rows
 
 student_bp = Blueprint('student', __name__)
 
@@ -48,11 +48,20 @@ def dashboard():
         AND g.total_grade IS NOT NULL
         ORDER BY g.published_at DESC, g.updated_at DESC LIMIT 5""", (sid,))
 
+    academic_alert = None
+    if sid:
+        try:
+            rows = call_proc_rows('sp_list_academic_alerts', (None, sid))
+            academic_alert = rows[0] if rows else None
+        except Exception:
+            academic_alert = None
+
     return render_template('student/dashboard.html',
                            enrolled_count=enrolled_count,
                            gpa=gpa,
                            total_credits=total_credits,
-                           recent_grades=recent_grades)
+                           recent_grades=recent_grades,
+                           academic_alert=academic_alert)
 
 
 _COURSE_SQL = """SELECT co.*, c.name AS course_name, c.code AS course_code, c.credit, c.hours,

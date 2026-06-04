@@ -1,6 +1,23 @@
 {% extends "base.html" %}
 {% block title %}学生控制台{% endblock %}{% block page_title %}学生工作台{% endblock %}
 {% block content %}
+{% if academic_alert %}
+<div class="alert {% if academic_alert.risk_level == 'high' %}alert-danger{% elif academic_alert.risk_level == 'medium' %}alert-warning{% else %}alert-info{% endif %} mb-4">
+    <div class="d-flex align-items-start">
+        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+        <div>
+            <strong>学业预警提示</strong>
+            {% if academic_alert.risk_level == 'high' %}（高风险）
+            {% elif academic_alert.risk_level == 'medium' %}（中风险）
+            {% else %}（低风险）{% endif %}
+            <p class="mb-1 mt-1">{{ academic_alert.risk_reasons }}</p>
+            {% if academic_alert.projected_semester_gpa is not none %}
+            <small class="text-muted">预测本学期 GPA：{{ "%.2f"|format(academic_alert.projected_semester_gpa|float) }}</small>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card text-bg-primary"><div class="card-body text-center py-4">

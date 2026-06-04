@@ -70,6 +70,16 @@ def call_proc(proc_name, args, out_indices):
         return cur.fetchone()
 
 
+def call_proc_rows(proc_name, args=()):
+    """调用返回结果集的存储过程"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.callproc(proc_name, args)
+        rows = cur.fetchall()
+        conn.commit()
+        return rows
+
+
 def insert(sql, args=None):
     """执行插入操作，返回自增ID"""
     conn = get_conn()

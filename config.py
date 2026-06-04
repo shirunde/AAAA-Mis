@@ -27,3 +27,9 @@ class Config:
     # Grade weights (must match trigger/procedure in sql/03_procedures.sql)
     REGULAR_WEIGHT = 0.3
     EXAM_WEIGHT = 0.7
+
+    # Academic alert thresholds (documented in sql/05_academic_alerts.sql)
+    GPA_HIGH_RISK = 2.0
+    GPA_WATCH = 2.3
+    GPA_DECLINE_THRESHOLD = 0.5
+    MIN_CREDITS_FOR_GPA_ALERT = 6

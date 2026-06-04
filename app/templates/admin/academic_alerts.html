@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}学业预警{% endblock %}{% block page_title %}学业预警 / GPA 预测{% endblock %}
+{% block content %}
+
+<div class="alert alert-light border mb-4">
+    <i class="bi bi-info-circle"></i>
+    基于<strong>累计 GPA</strong>、<strong>学期 GPA 趋势</strong>与<strong>在修课程预测总评</strong>（平时 30% + 期末 70%）识别学业风险，供管理员干预参考。
+</div>
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-md-3">
+        <label class="form-label small text-muted">学期</label>
+        <select name="semester_id" class="form-select">
+            {% for sem in semesters %}
+            <option value="{{ sem.id }}" {% if semester_id == sem.id %}selected{% endif %}>
+                {{ sem.name }}{% if sem.is_current %}（当前）{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small text-muted">风险等级</label>
+        <select name="risk" class="form-select">
+            <option value="">全部</option>
+            <option value="high" {% if risk_filter=='high' %}selected{% endif %}>高风险</option>
+            <option value="medium" {% if risk_filter=='medium' %}selected{% endif %}>中风险</option>
+            <option value="low" {% if risk_filter=='low' %}selected{% endif %}>低风险</option>
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label small text-muted">搜索</label>
+        <input type="text" name="search" class="form-control" placeholder="学号 / 姓名 / 专业 / 班级" value="{{ search }}">
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">筛选</button>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body text-center py-3">
+                <h3 class="text-danger mb-0">{{ summary.high }}</h3>
+                <p class="mb-0 text-muted">高风险</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning">
+            <div class="card-body text-center py-3">
+                <h3 class="text-warning mb-0">{{ summary.medium }}</h3>
+                <p class="mb-0 text-muted">中风险</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body text-center py-3">
+                <h3 class="text-info mb-0">{{ summary.low }}</h3>
+                <p class="mb-0 text-muted">低风险</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-secondary">
+            <div class="card-body text-center py-3">
+                <h3 class="mb-0">{{ alerts|length }}</h3>
+                <p class="mb-0 text-muted">预警学生总数</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <canvas id="riskChart" height="220"></canvas>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><strong>预警规则说明</strong></div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li><span class="badge bg-danger">高</span> 累计 GPA &lt; 2.0（已修 ≥ 6 学分）、累计 ≥ 2 门不及格、本学期多门不及格或预测多门挂科</li>
+                    <li><span class="badge bg-warning text-dark">中</span> 累计 GPA 2.0~2.3、较上学期 GPA 下滑 ≥ 0.5、预测学期 GPA 明显低于累计水平</li>
+                    <li><span class="badge bg-info">低</span> 单门历史/本学期不及格，或预测单门挂科风险</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>预警学生列表</strong>
+        {% if selected_semester %}
+        <span class="text-muted small">参考学期：{{ selected_semester.name }}</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if alerts %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>学号</th><th>姓名</th><th>专业</th><th>班级</th>
+                        <th>累计GPA</th><th>已修学分</th>
+                        <th>学期GPA</th><th>预测学期GPA</th>
+                        <th>风险</th><th>预警原因</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in alerts %}
+                    <tr>
+                        <td>{{ a.student_no }}</td>
+                        <td>{{ a.student_name }}</td>
+                        <td>{{ a.major_name or '-' }}</td>
+                        <td>{{ a.class_name or '-' }}</td>
+                        <td>
+                            {% if a.cumulative_gpa is not none %}
+                            <strong class="{% if a.cumulative_gpa|float < 2.0 %}text-danger{% elif a.cumulative_gpa|float < 2.3 %}text-warning{% endif %}">
+                                {{ "%.2f"|format(a.cumulative_gpa|float) }}
+                            </strong>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ a.earned_credits or 0 }}</td>
+                        <td>
+                            {% if a.current_semester_gpa is not none %}
+                            {{ "%.2f"|format(a.current_semester_gpa|float) }}
+                            {% if a.gpa_decline and a.gpa_decline|float >= 0.5 %}
+                            <small class="text-danger d-block">↓{{ "%.2f"|format(a.gpa_decline|float) }}</small>
+                            {% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if a.projected_semester_gpa is not none %}
+                            {{ "%.2f"|format(a.projected_semester_gpa|float) }}
+                            {% if a.projected_fail_count %}<small class="text-muted d-block">风险课 {{ a.projected_fail_count }} 门</small>{% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if a.risk_level == 'high' %}
+                            <span class="badge bg-danger">高</span>
+                            {% elif a.risk_level == 'medium' %}
+                            <span class="badge bg-warning text-dark">中</span>
+                            {% else %}
+                            <span class="badge bg-info">低</span>
+                            {% endif %}
+                        </td>
+                        <td><small>{{ a.risk_reasons }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0 text-center py-4">
+            <i class="bi bi-emoji-smile fs-3 d-block mb-2"></i>
+            当前筛选条件下暂无预警学生
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+if (document.getElementById('riskChart')) {
+    new Chart(document.getElementById('riskChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['高风险', '中风险', '低风险'],
+            datasets: [{
+                data: [{{ summary.high }}, {{ summary.medium }}, {{ summary.low }}],
+                backgroundColor: ['#dc3545', '#ffc107', '#0dcaf0']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: { display: true, text: '学业风险分布' },
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

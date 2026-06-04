@@ -9,6 +9,10 @@
     <div class="col-md-3"><div class="card text-bg-secondary"><div class="card-body text-center py-3"><h3>{{ stats.offering_count }}</h3><p class="mb-0">开课总数</p></div></div></div>
     <div class="col-md-3"><div class="card text-bg-dark"><div class="card-body text-center py-3"><h3>{{ stats.enrollment_count }}</h3><p class="mb-0">选课记录</p></div></div></div>
     <div class="col-md-3"><div class="card border-primary"><div class="card-body text-center py-3"><h3 class="text-primary">{{ stats.published_grade_count }}</h3><p class="mb-0">已发布成绩</p></div></div></div>
+    <div class="col-md-3"><div class="card border-danger"><div class="card-body text-center py-3">
+        <h3 class="text-danger">{{ stats.academic_alert_count }}</h3>
+        <p class="mb-0"><a href="{{ url_for('admin.academic_alerts') }}" class="text-decoration-none text-danger">学业预警</a></p>
+    </div></div></div>
 </div>
 <div class="card"><div class="card-header"><strong>最近操作日志</strong></div>
     <div class="card-body"><div class="table-responsive"><table class="table table-sm table-hover">

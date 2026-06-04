@@ -22,6 +22,7 @@ pip install -r requirements.txt
 mysql -u root -p < sql/01_schema.sql
 mysql -u root -p < sql/03_procedures.sql
 mysql -u root -p < sql/04_views.sql
+mysql -u root -p < sql/05_academic_alerts.sql
 mysql -u root -p < sql/02_seed.sql
 ```
 
@@ -53,7 +54,8 @@ mis/
 │   ├── 01_schema.sql         # 建表(12张表)
 │   ├── 02_seed.sql           # 种子数据
 │   ├── 03_procedures.sql     # 存储过程&触发器
-│   └── 04_views.sql          # 视图定义
+│   ├── 04_views.sql          # 视图定义
+│   └── 05_academic_alerts.sql # 学业预警视图&存储过程
 ├── app/                      # 应用模块
 │   ├── db.py                 # 数据库连接池
 │   ├── decorators.py         # 权限装饰器
@@ -70,8 +72,9 @@ mis/
 
 - 12张核心表，完整的3NF设计
 - 5个存储过程（选课、退课、成绩计算、GPA计算、审核）
+- 1个拓展存储过程（学业预警列表 `sp_list_academic_alerts`）
 - 3个触发器（选课自动创建成绩、成绩更新自动计算、状态变更日志）
-- 4个视图（课表、成绩单、选课统计、教师工作量）
+- 6个视图（课表、成绩单、选课统计、教师工作量、累计GPA、学期GPA）
 
 ## 核心业务流
 
@@ -79,4 +82,5 @@ mis/
 管理员录入基础信息 → 教师申请开课 → 管理员审核发布
     → 配置选课时间窗口 → 学生选课/退课
     → 教师录入成绩 → 管理员审核发布 → 学生查看成绩
+    → 管理员查看学业预警 / GPA 下滑预测
 ```

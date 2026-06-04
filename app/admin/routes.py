@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.decorators import role_required
-from app.db import query, execute, insert, paginate, call_proc, get_conn
+from app.db import query, execute, insert, paginate, call_proc, get_conn, call_proc_rows
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -15,6 +15,28 @@ admin_bp = Blueprint('admin', __name__)
 @role_required('admin')
 def check_admin():
     pass
+
+
+def _fetch_academic_alerts(semester_id=None, student_id=None):
+    """调用 sp_list_academic_alerts 获取预警学生列表"""
+    try:
+        return call_proc_rows('sp_list_academic_alerts', (semester_id, student_id))
+    except Exception:
+        return []
+
+
+def _count_academic_alerts(semester_id=None):
+    alerts = _fetch_academic_alerts(semester_id)
+    return len(alerts)
+
+
+def _alert_summary(alerts):
+    summary = {'high': 0, 'medium': 0, 'low': 0}
+    for row in alerts:
+        level = row.get('risk_level')
+        if level in summary:
+            summary[level] += 1
+    return summary
 
 
 @admin_bp.route('/')
@@ -27,6 +49,7 @@ def dashboard():
         'pending_count': query("SELECT COUNT(*) AS c FROM course_offerings WHERE status='pending'", one=True)['c'],
         'enrollment_count': query("SELECT COUNT(*) AS c FROM enrollments WHERE status='enrolled'", one=True)['c'],
         'published_grade_count': query("SELECT COUNT(*) AS c FROM grades WHERE status='published'", one=True)['c'],
+        'academic_alert_count': _count_academic_alerts(),
     }
     recent_logs = query(
         "SELECT sl.*, u.username FROM system_logs sl LEFT JOIN users u ON sl.user_id=u.id ORDER BY sl.id DESC LIMIT 10"
@@ -548,3 +571,44 @@ def statistics():
     return render_template('admin/statistics.html',
                            selection_stats=selection_stats, grade_dist=grade_dist,
                            teacher_workload=teacher_workload)
+
+
+# ---- 学业预警 ----
+@admin_bp.route('/academic-alerts')
+def academic_alerts():
+    semester_id = request.args.get('semester_id', type=int)
+    risk_filter = request.args.get('risk', '').strip()
+    search = request.args.get('search', '').strip()
+
+    semesters = query('SELECT * FROM semesters ORDER BY start_date DESC')
+    if semester_id is None:
+        current = query('SELECT id FROM semesters WHERE is_current=1 ORDER BY id DESC LIMIT 1', one=True)
+        semester_id = current['id'] if current else None
+
+    alerts = _fetch_academic_alerts(semester_id)
+
+    if risk_filter in ('high', 'medium', 'low'):
+        alerts = [a for a in alerts if a.get('risk_level') == risk_filter]
+    if search:
+        key = search.lower()
+        alerts = [
+            a for a in alerts
+            if key in (a.get('student_no') or '').lower()
+            or key in (a.get('student_name') or '').lower()
+            or key in (a.get('major_name') or '').lower()
+            or key in (a.get('class_name') or '').lower()
+        ]
+
+    summary = _alert_summary(alerts)
+    selected_semester = query('SELECT * FROM semesters WHERE id=%s', (semester_id,), one=True) if semester_id else None
+
+    return render_template(
+        'admin/academic_alerts.html',
+        alerts=alerts,
+        summary=summary,
+        semesters=semesters,
+        semester_id=semester_id,
+        selected_semester=selected_semester,
+        risk_filter=risk_filter,
+        search=search,
+    )
