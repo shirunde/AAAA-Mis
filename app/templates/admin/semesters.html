@@ -19,7 +19,7 @@
             <td>{% if s.is_current %}<span class="badge bg-success">当前</span>{% else %}-{% endif %}</td>
             <td>
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ s.id }}">编辑</button>
-                <form method="post" action="{{ url_for('admin.semesters_delete', sid=s.id) }}" style="display:inline" onsubmit="return confirm('确认删除？')">
+                <form method="post" action="{{ url_for('admin.semesters_delete', sid=s.id) }}" style="display:inline" onsubmit="return confirm('确认删除学期「{{ s.name }}」？此操作不可恢复！')">
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-danger">删除</button>
                 </form>

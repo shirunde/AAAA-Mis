@@ -1,11 +1,12 @@
 """管理员模块路由"""
 import random
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.decorators import role_required
 from app.db import query, execute, insert, paginate, call_proc, get_conn, call_proc_rows
+from app.helpers import log_action
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -75,6 +76,7 @@ def semesters_add():
     execute('INSERT INTO semesters (name,start_date,end_date,is_current) VALUES (%s,%s,%s,%s)',
             (name, start_date, end_date, is_current))
     flash('学期添加成功', 'success')
+    log_action('semester_add', 'semester', None, f'添加学期: {name}')
     return redirect(url_for('admin.semesters'))
 
 
@@ -86,6 +88,7 @@ def semesters_edit(sid):
     execute('UPDATE semesters SET name=%s,start_date=%s,end_date=%s,is_current=%s WHERE id=%s',
             (request.form['name'], request.form['start_date'], request.form['end_date'], is_current, sid))
     flash('学期更新成功', 'success')
+    log_action('semester_edit', 'semester', sid, f'更新学期: {request.form["name"]}')
     return redirect(url_for('admin.semesters'))
 
 
@@ -93,6 +96,7 @@ def semesters_edit(sid):
 def semesters_delete(sid):
     execute('DELETE FROM semesters WHERE id=%s', (sid,))
     flash('学期已删除', 'info')
+    log_action('semester_delete', 'semester', sid, f'删除学期ID={sid}')
     return redirect(url_for('admin.semesters'))
 
 
@@ -108,6 +112,7 @@ def majors_add():
     execute('INSERT INTO majors (name,code,description) VALUES (%s,%s,%s)',
             (request.form['name'], request.form['code'], request.form.get('description', '')))
     flash('专业添加成功', 'success')
+    log_action('major_add', 'major', None, f'添加专业: {request.form["name"]}')
     return redirect(url_for('admin.majors'))
 
 
@@ -116,6 +121,7 @@ def majors_edit(mid):
     execute('UPDATE majors SET name=%s,code=%s,description=%s WHERE id=%s',
             (request.form['name'], request.form['code'], request.form.get('description', ''), mid))
     flash('专业更新成功', 'success')
+    log_action('major_edit', 'major', mid, f'更新专业: {request.form["name"]}')
     return redirect(url_for('admin.majors'))
 
 
@@ -123,6 +129,7 @@ def majors_edit(mid):
 def majors_delete(mid):
     execute('DELETE FROM majors WHERE id=%s', (mid,))
     flash('专业已删除', 'info')
+    log_action('major_delete', 'major', mid, f'删除专业ID={mid}')
     return redirect(url_for('admin.majors'))
 
 
@@ -140,6 +147,7 @@ def classes_add():
     execute('INSERT INTO classes (name,major_id,grade) VALUES (%s,%s,%s)',
             (request.form['name'], request.form['major_id'], request.form['grade']))
     flash('班级添加成功', 'success')
+    log_action('class_add', 'class', None, f'添加班级: {request.form["name"]}')
     return redirect(url_for('admin.classes'))
 
 
@@ -148,6 +156,7 @@ def classes_edit(cid):
     execute('UPDATE classes SET name=%s,major_id=%s,grade=%s WHERE id=%s',
             (request.form['name'], request.form['major_id'], request.form['grade'], cid))
     flash('班级更新成功', 'success')
+    log_action('class_edit', 'class', cid, f'更新班级: {request.form["name"]}')
     return redirect(url_for('admin.classes'))
 
 
@@ -155,6 +164,7 @@ def classes_edit(cid):
 def classes_delete(cid):
     execute('DELETE FROM classes WHERE id=%s', (cid,))
     flash('班级已删除', 'info')
+    log_action('class_delete', 'class', cid, f'删除班级ID={cid}')
     return redirect(url_for('admin.classes'))
 
 
@@ -172,6 +182,7 @@ def courses_add():
             (request.form['code'], request.form['name'], request.form['credit'],
              request.form['hours'], request.form['course_type'], request.form.get('description', '')))
     flash('课程添加成功', 'success')
+    log_action('course_add', 'course', None, f'添加课程: {request.form["name"]}')
     return redirect(url_for('admin.courses_manage'))
 
 
@@ -182,6 +193,7 @@ def courses_edit(cid):
             (request.form['code'], request.form['name'], request.form['credit'],
              request.form['hours'], request.form['course_type'], request.form.get('description', ''), cid))
     flash('课程更新成功', 'success')
+    log_action('course_edit', 'course', cid, f'更新课程: {request.form["name"]}')
     return redirect(url_for('admin.courses_manage'))
 
 
@@ -189,6 +201,7 @@ def courses_edit(cid):
 def courses_delete(cid):
     execute('DELETE FROM courses WHERE id=%s', (cid,))
     flash('课程已删除', 'info')
+    log_action('course_delete', 'course', cid, f'删除课程ID={cid}')
     return redirect(url_for('admin.courses_manage'))
 
 
@@ -223,6 +236,7 @@ def students_toggle(sid):
         u = query('SELECT is_active FROM users WHERE id=%s', (s['user_id'],), one=True)
         execute('UPDATE users SET is_active=%s WHERE id=%s', (0 if u['is_active'] else 1, s['user_id']))
         flash('用户状态已切换', 'success')
+        log_action('student_toggle', 'student', sid, '切换学生账号状态')
     return redirect(url_for('admin.students'))
 
 
@@ -233,6 +247,7 @@ def students_edit(sid):
              request.form.get('phone', ''), request.form.get('email', ''),
              request.form.get('status', 'active'), sid))
     flash('学生信息更新成功', 'success')
+    log_action('student_edit', 'student', sid, f'更新学生ID={sid}')
     return redirect(url_for('admin.students'))
 
 
@@ -261,6 +276,7 @@ def students_add():
                          request.form.get('phone', ''), request.form.get('email', '')))
             conn.commit()
         flash('学生添加成功', 'success')
+        log_action('student_add', 'student', None, f'添加学生: {request.form["name"]}')
     except Exception as e:
         flash(f'添加失败：{str(e)}', 'danger')
     return redirect(url_for('admin.students'))
@@ -277,6 +293,7 @@ def students_reset_password(sid):
         execute('UPDATE users SET password_hash=%s WHERE id=%s',
                 (generate_password_hash(new_password), s['user_id']))
         flash('密码已重置', 'success')
+        log_action('student_reset_password', 'student', sid, '重置学生密码')
     else:
         flash('学生不存在', 'danger')
     return redirect(url_for('admin.students'))
@@ -306,6 +323,7 @@ def teachers_toggle(tid):
         u = query('SELECT is_active FROM users WHERE id=%s', (t['user_id'],), one=True)
         execute('UPDATE users SET is_active=%s WHERE id=%s', (0 if u['is_active'] else 1, t['user_id']))
         flash('用户状态已切换', 'success')
+        log_action('teacher_toggle', 'teacher', tid, '切换教师账号状态')
     return redirect(url_for('admin.teachers'))
 
 
@@ -315,6 +333,7 @@ def teachers_edit(tid):
             (request.form.get('title', ''), request.form.get('phone', ''),
              request.form.get('email', ''), tid))
     flash('教师信息更新成功', 'success')
+    log_action('teacher_edit', 'teacher', tid, f'更新教师ID={tid}')
     return redirect(url_for('admin.teachers'))
 
 
@@ -341,6 +360,7 @@ def teachers_add():
                          request.form.get('email', '')))
             conn.commit()
         flash('教师添加成功', 'success')
+        log_action('teacher_add', 'teacher', None, f'添加教师: {request.form["name"]}')
     except Exception as e:
         flash(f'添加失败：{str(e)}', 'danger')
     return redirect(url_for('admin.teachers'))
@@ -357,6 +377,7 @@ def teachers_reset_password(tid):
         execute('UPDATE users SET password_hash=%s WHERE id=%s',
                 (generate_password_hash(new_password), t['user_id']))
         flash('密码已重置', 'success')
+        log_action('teacher_reset_password', 'teacher', tid, '重置教师密码')
     else:
         flash('教师不存在', 'danger')
     return redirect(url_for('admin.teachers'))
@@ -366,15 +387,28 @@ def teachers_reset_password(tid):
 @admin_bp.route('/offerings')
 def offerings():
     page = request.args.get('page', 1, type=int)
-    sql = """SELECT co.*, c.name AS course_name, c.code AS course_code,
+    status_filter = request.args.get('status', '').strip()
+    search = request.args.get('search', '').strip()
+
+    where = ''
+    args = []
+    if status_filter in ('pending', 'approved', 'rejected', 'published'):
+        where += ' AND co.status=%s'
+        args.append(status_filter)
+    if search:
+        where += ' AND (c.name LIKE %s OR c.code LIKE %s OR t.name LIKE %s)'
+        args.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
+
+    sql = f"""SELECT co.*, c.name AS course_name, c.code AS course_code,
                     t.name AS teacher_name, sem.name AS semester_name
              FROM course_offerings co
              JOIN courses c ON co.course_id=c.id
              JOIN teachers t ON co.teacher_id=t.id
              JOIN semesters sem ON co.semester_id=sem.id
+             WHERE 1=1{where}
              ORDER BY co.status ASC, co.created_at DESC"""
-    data = paginate(sql, page=page)
-    return render_template('admin/offerings.html', **data)
+    data = paginate(sql, tuple(args), page=page)
+    return render_template('admin/offerings.html', **data, status_filter=status_filter, search=search)
 
 
 @admin_bp.route('/offerings/<int:oid>/review', methods=['POST'])
@@ -401,6 +435,7 @@ def offerings_review(oid):
 def offerings_publish(oid):
     execute("UPDATE course_offerings SET status='published' WHERE id=%s AND status='approved'", (oid,))
     flash('课程已发布', 'success')
+    log_action('offering_publish', 'offering', oid, f'发布开课ID={oid}')
     return redirect(url_for('admin.offerings'))
 
 
@@ -420,6 +455,7 @@ def selection_periods_add():
             (request.form['semester_id'], request.form['name'],
              request.form['start_time'], request.form['end_time'], request.form['period_type']))
     flash('选课时间段添加成功', 'success')
+    log_action('selection_period_add', 'selection_period', None, '添加选课时间段')
     return redirect(url_for('admin.selection_periods'))
 
 
@@ -432,6 +468,7 @@ def selection_periods_edit(pid):
              request.form['start_time'], request.form['end_time'],
              request.form['period_type'], pid))
     flash('选课时间段更新成功', 'success')
+    log_action('selection_period_edit', 'selection_period', pid, '更新选课时间段')
     return redirect(url_for('admin.selection_periods'))
 
 
@@ -440,6 +477,7 @@ def selection_periods_toggle(pid):
     p = query('SELECT is_active FROM course_selection_periods WHERE id=%s', (pid,), one=True)
     execute('UPDATE course_selection_periods SET is_active=%s WHERE id=%s', (0 if p['is_active'] else 1, pid))
     flash('时间段状态已切换', 'success')
+    log_action('selection_period_toggle', 'selection_period', pid, '切换选课时间段状态')
     return redirect(url_for('admin.selection_periods'))
 
 
@@ -447,6 +485,7 @@ def selection_periods_toggle(pid):
 def selection_periods_delete(pid):
     execute('DELETE FROM course_selection_periods WHERE id=%s', (pid,))
     flash('选课时间段已删除', 'info')
+    log_action('selection_period_delete', 'selection_period', pid, f'删除选课时间段ID={pid}')
     return redirect(url_for('admin.selection_periods'))
 
 
@@ -478,10 +517,8 @@ def grades_approve(gid):
             if cur.rowcount == 0:
                 flash('该成绩不存在或已审核', 'warning')
                 return redirect(url_for('admin.grades_review'))
-            cur.execute("""INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
-                           VALUES (%s, 'grade_approved', 'grade', %s, '管理员审核通过成绩')""",
-                        (current_user['id'], gid))
             conn.commit()
+        log_action('grade_approved', 'grade', gid, '管理员审核通过成绩')
         flash('成绩已审核通过', 'success')
     except Exception as e:
         flash(f'审核失败：{str(e)}', 'danger')
@@ -497,13 +534,35 @@ def grades_publish(gid):
             if cur.rowcount == 0:
                 flash('该成绩不存在或未通过审核', 'warning')
                 return redirect(url_for('admin.grades_review'))
-            cur.execute("""INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
-                           VALUES (%s, 'grade_published', 'grade', %s, '管理员发布成绩')""",
-                        (current_user['id'], gid))
             conn.commit()
+        log_action('grade_published', 'grade', gid, '管理员发布成绩')
         flash('成绩已发布', 'success')
     except Exception as e:
         flash(f'发布失败：{str(e)}', 'danger')
+    return redirect(url_for('admin.grades_review'))
+
+
+@admin_bp.route('/grades/<int:gid>/reject', methods=['POST'])
+def grades_reject(gid):
+    reason = request.form.get('reject_reason', '').strip()
+    if not reason:
+        flash('请填写驳回原因', 'danger')
+        return redirect(url_for('admin.grades_review'))
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE grades SET status='draft', submitted_at=NULL WHERE id=%s AND status='submitted'",
+                (gid,)
+            )
+            if cur.rowcount == 0:
+                flash('该成绩不存在或无法驳回', 'warning')
+                return redirect(url_for('admin.grades_review'))
+            conn.commit()
+        log_action('grade_rejected', 'grade', gid, f'管理员驳回成绩，原因: {reason}')
+        flash('成绩已驳回，教师可重新修改', 'success')
+    except Exception as e:
+        flash(f'驳回失败：{str(e)}', 'danger')
     return redirect(url_for('admin.grades_review'))
 
 
@@ -514,11 +573,9 @@ def grades_batch_publish():
         with conn.cursor() as cur:
             cur.execute("UPDATE grades SET status='published',published_at=NOW() WHERE status='approved'")
             count = cur.rowcount
-            if count > 0:
-                cur.execute("""INSERT INTO system_logs (user_id, action, target_type, target_id, detail)
-                               VALUES (%s, 'grade_batch_published', 'grade', 0, %s)""",
-                            (current_user['id'], f'批量发布{count}条成绩'))
             conn.commit()
+        if count > 0:
+            log_action('grade_batch_published', 'grade', 0, f'批量发布{count}条成绩')
         flash(f'已批量发布{count}条成绩', 'success')
     except Exception as e:
         flash(f'批量发布失败：{str(e)}', 'danger')
@@ -531,15 +588,23 @@ def logs():
     page = request.args.get('page', 1, type=int)
     action_filter = request.args.get('action', '').strip()
 
+    base_sql = """SELECT sl.*, u.username FROM system_logs sl
+                  LEFT JOIN users u ON sl.user_id=u.id"""
+    count_sql = "SELECT COUNT(*) AS total FROM system_logs sl"
+
     where = ''
     args = []
     if action_filter:
         where = ' WHERE sl.action LIKE %s'
         args = [f'%{action_filter}%']
 
-    sql = f"""SELECT sl.*, u.username FROM system_logs sl
-              LEFT JOIN users u ON sl.user_id=u.id{where} ORDER BY sl.id DESC"""
-    data = paginate(sql, tuple(args), page=page)
+    data = paginate(
+        base_sql + where + ' ORDER BY sl.id DESC',
+        tuple(args) if args else None,
+        page=page,
+        count_sql=count_sql + where,
+        count_args=tuple(args) if args else None,
+    )
     return render_template('admin/logs.html', **data, action_filter=action_filter)
 
 
@@ -600,15 +665,27 @@ def academic_alerts():
         ]
 
     summary = _alert_summary(alerts)
+
+    # 手动分页
+    per_page = current_app.config['PER_PAGE']
+    total = len(alerts)
+    pages = max(1, (total + per_page - 1) // per_page)
+    page_num = request.args.get('page', 1, type=int)
+    page_num = min(max(1, page_num), pages)
+    start = (page_num - 1) * per_page
+    end = start + per_page
+    paginated_alerts = alerts[start:end]
+
     selected_semester = query('SELECT * FROM semesters WHERE id=%s', (semester_id,), one=True) if semester_id else None
 
     return render_template(
         'admin/academic_alerts.html',
-        alerts=alerts,
+        alerts=paginated_alerts,
         summary=summary,
         semesters=semesters,
         semester_id=semester_id,
         selected_semester=selected_semester,
         risk_filter=risk_filter,
         search=search,
+        total=total, page=page_num, pages=pages,
     )

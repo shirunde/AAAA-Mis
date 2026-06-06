@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.decorators import role_required
 from app.db import query, execute
+from app.helpers import log_action
 
 teacher_bp = Blueprint('teacher', __name__)
 
@@ -76,6 +77,7 @@ def apply_offering():
              request.form.get('schedule', ''), request.form.get('apply_reason', ''))
         )
         flash('开课申请已提交，请等待管理员审核', 'success')
+        log_action('offering_apply', 'offering', None, f'申请开课: course_id={request.form["course_id"]}')
         return redirect(url_for('teacher.my_offerings'))
 
     courses = query('SELECT * FROM courses ORDER BY id')
@@ -111,6 +113,7 @@ def withdraw_offering(oid):
         return redirect(url_for('teacher.my_offerings'))
     execute('DELETE FROM course_offerings WHERE id=%s AND status=%s', (oid, 'pending'))
     flash('开课申请已撤销', 'success')
+    log_action('offering_withdraw', 'offering', oid, f'撤销开课申请ID={oid}')
     return redirect(url_for('teacher.my_offerings'))
 
 
@@ -127,6 +130,7 @@ def edit_offering(oid):
              request.form['max_students'], request.form.get('classroom', ''),
              request.form.get('schedule', ''), request.form.get('apply_reason', ''), oid))
     flash('开课申请已更新', 'success')
+    log_action('offering_edit', 'offering', oid, f'修改开课申请ID={oid}')
     return redirect(url_for('teacher.my_offerings'))
 
 
@@ -182,6 +186,7 @@ def grade_edit(eid):
         """UPDATE grades SET regular_grade=%s, exam_grade=%s WHERE enrollment_id=%s""",
         (regular_val, exam_val, eid)
     )
+    log_action('grade_edit', 'grade', eid, f'录入/修改成绩 enrollment={eid}')
     flash('成绩保存成功', 'success')
     return redirect(request.referrer or url_for('teacher.dashboard'))
 
@@ -193,6 +198,7 @@ def grade_submit(eid):
         "UPDATE grades SET status='submitted', submitted_at=NOW() WHERE enrollment_id=%s AND status='draft'",
         (eid,)
     )
+    log_action('grade_submit', 'grade', eid, f'提交成绩 enrollment={eid}')
     flash('成绩已提交，等待管理员审核', 'success')
     return redirect(request.referrer or url_for('teacher.dashboard'))
 
@@ -209,6 +215,62 @@ def grade_submit_all(oid):
         (oid,)
     )
     flash('所有已录入成绩的课程已批量提交', 'success')
+    log_action('grade_batch_submit', 'grade', oid, f'批量提交成绩 offering={oid}')
+    return redirect(url_for('teacher.offering_students', oid=oid))
+
+
+@teacher_bp.route('/grade/<int:eid>/withdraw', methods=['POST'])
+def grade_withdraw(eid):
+    require_enrollment_owner(eid)
+    locked = query("SELECT status FROM grades WHERE enrollment_id=%s", (eid,), one=True)
+    if not locked or locked['status'] != 'submitted':
+        flash('只能撤回已提交且未审核的成绩', 'warning')
+        return redirect(request.referrer or url_for('teacher.dashboard'))
+    execute(
+        "UPDATE grades SET status='draft', submitted_at=NULL WHERE enrollment_id=%s AND status='submitted'",
+        (eid,)
+    )
+    log_action('grade_withdraw', 'grade', eid, '教师撤回已提交成绩')
+    flash('成绩已撤回至草稿状态', 'success')
+    return redirect(request.referrer or url_for('teacher.dashboard'))
+
+
+@teacher_bp.route('/offering/<int:oid>/batch-grade', methods=['POST'])
+def batch_grade_edit(oid):
+    require_offering_owner(oid)
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            for key, value in request.form.items():
+                parts = key.split('_', 1)
+                if len(parts) != 2:
+                    continue
+                field, eid_str = parts
+                if field not in ('regular', 'exam') or not eid_str.isdigit():
+                    continue
+                eid = int(eid_str)
+                val = value.strip()
+                num_val = float(val) if val else None
+                if num_val is not None and not (0 <= num_val <= 100):
+                    conn.rollback()
+                    flash('成绩值必须在 0-100 之间', 'danger')
+                    return redirect(url_for('teacher.offering_students', oid=oid))
+
+                cur.execute("SELECT status FROM grades WHERE enrollment_id=%s FOR UPDATE", (eid,))
+                row = cur.fetchone()
+                if row and row['status'] != 'draft':
+                    continue
+
+                col_name = 'regular_grade' if field == 'regular' else 'exam_grade'
+                cur.execute(
+                    f"UPDATE grades SET {col_name}=%s WHERE enrollment_id=%s AND status='draft'",
+                    (num_val, eid)
+                )
+            conn.commit()
+        log_action('grade_batch_edit', 'grade', oid, f'批量录入成绩 offering={oid}')
+        flash('批量成绩保存成功', 'success')
+    except Exception as e:
+        flash(f'批量保存失败：{str(e)}', 'danger')
     return redirect(url_for('teacher.offering_students', oid=oid))
 
 

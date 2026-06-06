@@ -1,8 +1,10 @@
 """学生模块路由"""
+from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app.decorators import role_required
 from app.db import query, execute, paginate, call_proc, call_proc_rows
+from app.helpers import parse_schedule_slots, get_active_selection_periods
 
 student_bp = Blueprint('student', __name__)
 
@@ -56,12 +58,14 @@ def dashboard():
         except Exception:
             academic_alert = None
 
+    selection_periods = get_active_selection_periods()
     return render_template('student/dashboard.html',
                            enrolled_count=enrolled_count,
                            gpa=gpa,
                            total_credits=total_credits,
                            recent_grades=recent_grades,
-                           academic_alert=academic_alert)
+                           academic_alert=academic_alert,
+                           selection_periods=selection_periods)
 
 
 _COURSE_SQL = """SELECT co.*, c.name AS course_name, c.code AS course_code, c.credit, c.hours,
@@ -99,19 +103,30 @@ def courses():
     data = paginate(_COURSE_SQL + where_extra + ' ORDER BY co.id DESC', tuple(args), page=page)
 
     enrolled_ids = set()
-    conflict_schedules = set()
+    conflict_offering_ids = set()
+    selection_periods = get_active_selection_periods()
     if sid:
         rows = query('SELECT course_offering_id FROM enrollments WHERE student_id=%s AND status=%s',
                      (sid, 'enrolled'))
         enrolled_ids = {r['course_offering_id'] for r in rows}
-        schedules = query("""SELECT co.schedule FROM enrollments e
+        # 用 parse_schedule_slots 做智能冲突检测（"周一1-2节"与"周一第1-2节"视为冲突）
+        enrolled_schedules = query("""SELECT co.id, co.schedule FROM enrollments e
                              JOIN course_offerings co ON e.course_offering_id = co.id
                              WHERE e.student_id = %s AND e.status = 'enrolled'
                                AND co.schedule IS NOT NULL AND co.schedule != ''""", (sid,))
-        conflict_schedules = {s['schedule'] for s in schedules}
+        enrolled_slots = set()
+        for es in enrolled_schedules:
+            enrolled_slots |= parse_schedule_slots(es['schedule'])
+        # 对当前页开课做冲突检测
+        for o in data.get('items', []):
+            if o['id'] not in enrolled_ids and o.get('schedule'):
+                o_slots = parse_schedule_slots(o['schedule'])
+                if o_slots & enrolled_slots:
+                    conflict_offering_ids.add(o['id'])
 
     return render_template('student/courses.html', **data, search=search, type=course_type,
-                           enrolled_ids=enrolled_ids, conflict_schedules=conflict_schedules)
+                           enrolled_ids=enrolled_ids, conflict_offering_ids=conflict_offering_ids,
+                           selection_periods=selection_periods)
 
 
 @student_bp.route('/course/<int:oid>/detail')
@@ -214,4 +229,4 @@ def transcript():
 
     gpa, total_credits = _calc_overall_gpa(sid)
     return render_template('student/transcript.html', student=student, grades=grades,
-                           gpa=gpa, total_credits=total_credits)
+                           gpa=gpa, total_credits=total_credits, now=datetime.now())

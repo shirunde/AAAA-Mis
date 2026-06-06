@@ -10,7 +10,7 @@
         <tr><td>{{ m.id }}</td><td>{{ m.name }}</td><td>{{ m.code }}</td><td>{{ m.description or '' }}</td>
             <td>
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ m.id }}">编辑</button>
-                <form method="post" action="{{ url_for('admin.majors_delete', mid=m.id) }}" style="display:inline" onsubmit="return confirm('确认删除？')">
+                <form method="post" action="{{ url_for('admin.majors_delete', mid=m.id) }}" style="display:inline" onsubmit="return confirm('确认删除专业「{{ m.name }}」？关联班级将受影响！')">
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-danger">删除</button>
                 </form>

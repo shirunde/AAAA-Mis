@@ -10,6 +10,7 @@
     {% include '_csrf_field.html' %}
     <button class="btn btn-sm btn-warning mb-3" onclick="return confirm('确认批量提交所有已录入分数？')">批量提交成绩</button>
 </form>
+<button class="btn btn-sm btn-outline-info mb-3" id="toggleBatch">切换批量录入</button>
 
 <table class="table table-bordered table-hover">
     <thead class="table-dark"><tr><th>学号</th><th>姓名</th><th>专业</th><th>班级</th><th>平时成绩</th><th>期末成绩</th><th>总评</th><th>状态</th><th>操作</th></tr></thead>
@@ -35,12 +36,44 @@
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-warning">提交</button>
                 </form>
+                {% elif s.grade_status == 'submitted' %}
+                <form method="post" action="{{ url_for('teacher.grade_withdraw', eid=s.enrollment_id) }}" style="display:inline"
+                      onsubmit="return confirm('确认撤回该成绩？撤回后可重新修改。')">
+                    {% include '_csrf_field.html' %}
+                    <button class="btn btn-sm btn-outline-secondary">撤回</button>
+                </form>
                 {% endif %}
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+<form method="post" action="{{ url_for('teacher.batch_grade_edit', oid=offering.id) }}" id="batchForm" style="display:none">
+    {% include '_csrf_field.html' %}
+    <table class="table table-bordered table-hover">
+        <thead class="table-dark"><tr><th>学号</th><th>姓名</th><th>平时成绩</th><th>期末成绩</th><th>当前状态</th></tr></thead>
+        <tbody>
+            {% for s in students %}
+            <tr>
+                <td>{{ s.student_no }}</td><td>{{ s.name }}</td>
+                <td><input type="number" step="0.1" name="regular_{{ s.enrollment_id }}" class="form-control form-control-sm"
+                           min="0" max="100" value="{{ s.regular_grade or '' }}" {% if s.grade_status != 'draft' and s.grade_status %}disabled{% endif %}></td>
+                <td><input type="number" step="0.1" name="exam_{{ s.enrollment_id }}" class="form-control form-control-sm"
+                           min="0" max="100" value="{{ s.exam_grade or '' }}" {% if s.grade_status != 'draft' and s.grade_status %}disabled{% endif %}></td>
+                <td>
+                    {% if s.grade_status == 'draft' %}<span class="badge bg-secondary">草稿</span>
+                    {% elif s.grade_status == 'submitted' %}<span class="badge bg-warning">已提交</span>
+                    {% elif s.grade_status == 'approved' %}<span class="badge bg-info">已审核</span>
+                    {% elif s.grade_status == 'published' %}<span class="badge bg-success">已发布</span>
+                    {% else %}<span class="badge bg-light text-dark">未录入</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-primary">批量保存</button>
+</form>
 
 {% for s in students %}
 <div class="modal fade" id="gradeModal{{ s.enrollment_id }}" tabindex="-1">
@@ -61,4 +94,12 @@
     </div></div>
 </div>
 {% endfor %}
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('toggleBatch').addEventListener('click', function() {
+    var bf = document.getElementById('batchForm');
+    bf.style.display = bf.style.display === 'none' ? '' : 'none';
+});
+</script>
 {% endblock %}

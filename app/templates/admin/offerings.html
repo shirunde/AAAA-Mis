@@ -2,6 +2,19 @@
 {% block title %}开课审核{% endblock %}{% block page_title %}开课申请审核{% endblock %}
 {% block content %}
 <div class="card"><div class="card-body">
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-3">
+        <select name="status" class="form-select">
+            <option value="">全部状态</option>
+            <option value="pending" {% if status_filter=='pending' %}selected{% endif %}>待审核</option>
+            <option value="approved" {% if status_filter=='approved' %}selected{% endif %}>已通过</option>
+            <option value="rejected" {% if status_filter=='rejected' %}selected{% endif %}>已驳回</option>
+            <option value="published" {% if status_filter=='published' %}selected{% endif %}>已发布</option>
+        </select>
+    </div>
+    <div class="col-md-4"><input type="text" name="search" class="form-control" placeholder="搜索课程名/代码/教师" value="{{ search or '' }}"></div>
+    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">筛选</button></div>
+</form>
 <div class="table-responsive">
 <table class="table table-bordered table-hover">
     <thead class="table-dark"><tr><th>ID</th><th>课程</th><th>教师</th><th>学期</th><th>上限</th><th>教室</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>

@@ -24,6 +24,7 @@
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-primary">审核通过</button>
                 </form>
+                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ g.id }}">驳回</button>
                 {% elif g.status=='approved' %}
                 <form method="post" action="{{ url_for('admin.grades_publish', gid=g.id) }}" style="display:inline">
                     {% include '_csrf_field.html' %}
@@ -36,5 +37,20 @@
     </tbody>
 </table></div>
 {% include "_pagination.html" %}
-</div></div>
+{% for g in items if g.status=='submitted' %}
+<div class="modal fade" id="rejectModal{{ g.id }}" tabindex="-1">
+    <div class="modal-dialog modal-sm"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.grades_reject', gid=g.id) }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>驳回成绩</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p>学生: {{ g.student_name }} / 课程: {{ g.course_name }}</p>
+                <div class="mb-3"><label class="form-label">驳回原因 *</label>
+                    <textarea name="reject_reason" class="form-control" rows="2" required></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-danger">确认驳回</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
 {% endblock %}

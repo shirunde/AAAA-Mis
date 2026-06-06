@@ -17,9 +17,14 @@
                     <tr><td>学号</td><td>{{ profile['student_no'] }}</td></tr>
                     {% elif profile and profile.get('teacher_no') %}
                     <tr><td>工号</td><td>{{ profile['teacher_no'] }}</td></tr>
+                    {% elif role == 'admin' %}
+                    <tr><td>角色说明</td><td>系统管理员</td></tr>
+                    {% if profile and profile.get('created_at') %}
+                    <tr><td>账号创建时间</td><td>{{ profile['created_at'] }}</td></tr>
                     {% endif %}
-                    <tr><td>姓名</td><td>{{ profile['name'] if profile else '' }}</td></tr>
-                    <tr><td>性别</td><td>{{ '男' if profile and profile['gender'] == 'M' else '女' }}</td></tr>
+                    {% endif %}
+                    <tr><td>姓名</td><td>{{ profile['name'] if profile and profile.get('name') else '' }}</td></tr>
+                    <tr><td>性别</td><td>{{ '男' if profile and profile.get('gender') == 'M' else '女' if profile and profile.get('gender') else '-' }}</td></tr>
                     {% if profile and profile.get('major_name') %}
                     <tr><td>专业</td><td>{{ profile['major_name'] }}</td></tr>
                     <tr><td>班级</td><td>{{ profile['class_name'] }}</td></tr>
@@ -37,6 +42,7 @@
             <div class="card-body">
                 <form method="post">
                     {% include '_csrf_field.html' %}
+                    {% if role != 'admin' %}
                     <div class="mb-3">
                         <label class="form-label">电话</label>
                         <input type="text" name="phone" class="form-control" value="{{ profile['phone'] if profile and profile['phone'] else '' }}">
@@ -45,6 +51,7 @@
                         <label class="form-label">邮箱</label>
                         <input type="email" name="email" class="form-control" value="{{ profile['email'] if profile and profile['email'] else '' }}">
                     </div>
+                    {% endif %}
                     <hr>
                     <div class="mb-3">
                         <label class="form-label">新密码 (留空不修改)</label>

@@ -8,10 +8,14 @@
             {% include '_csrf_field.html' %}
             <div class="row mb-3">
                 <div class="col-6"><label class="form-label">课程</label>
-                    <select name="course_id" class="form-select" required>
-                        <option value="">-- 选择课程 --</option>
-                        {% for c in courses %}<option value="{{ c.id }}">{{ c.name }} ({{ c.code }}) - {{ c.credit }}学分</option>{% endfor %}
-                    </select>
+                    <div class="d-flex gap-2">
+                        <select name="course_id" id="courseSelect" class="form-select" required>
+                            <option value="">-- 选择课程 --</option>
+                            {% for c in courses %}<option value="{{ c.id }}" data-credit="{{ c.credit }}" data-hours="{{ c.hours }}" data-type="{{ c.course_type }}" data-desc="{{ c.description or '' }}">{{ c.name }} ({{ c.code }}) - {{ c.credit }}学分</option>{% endfor %}
+                        </select>
+                        <button type="button" class="btn btn-sm btn-outline-info" id="previewBtn" disabled>预览</button>
+                    </div>
+                    <div id="coursePreview" class="mt-2 p-2 bg-light border rounded small" style="display:none"></div>
                 </div>
                 <div class="col-6"><label class="form-label">学期</label>
                     <select name="semester_id" class="form-select" required>
@@ -22,11 +26,32 @@
             <div class="row mb-3">
                 <div class="col-4"><label class="form-label">最大选课人数</label><input type="number" name="max_students" class="form-control" value="60" required></div>
                 <div class="col-4"><label class="form-label">上课教室</label><input type="text" name="classroom" class="form-control" placeholder="如：教学楼A301"></div>
-                <div class="col-4"><label class="form-label">上课时间</label><input type="text" name="schedule" class="form-control" placeholder="如：周一1-2节"></div>
+                <div class="col-4"><label class="form-label">上课时间</label><input type="text" name="schedule" class="form-control" placeholder="如：周一1-2节;周三3-4节"></div>
             </div>
             <div class="mb-3"><label class="form-label">申请理由</label><textarea name="apply_reason" class="form-control" rows="3"></textarea></div>
             <button type="submit" class="btn btn-primary">提交申请</button>
         </form>
     </div></div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+var cs = document.getElementById('courseSelect');
+var pb = document.getElementById('previewBtn');
+var pv = document.getElementById('coursePreview');
+cs.addEventListener('change', function() {
+    pb.disabled = !this.value;
+    pv.style.display = 'none';
+});
+pb.addEventListener('click', function() {
+    var opt = cs.options[cs.selectedIndex];
+    if (!opt.value) return;
+    var typeMap = {required:'必修', elective:'选修', optional:'任选'};
+    pv.innerHTML = '<strong>' + opt.textContent + '</strong><br>'
+        + '学分: ' + opt.dataset.credit + ' | 学时: ' + opt.dataset.hours
+        + ' | 类型: ' + (typeMap[opt.dataset.type]||opt.dataset.type)
+        + '<br>描述: ' + (opt.dataset.desc || '暂无');
+    pv.style.display = '';
+});
+</script>
 {% endblock %}

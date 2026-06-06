@@ -4,6 +4,8 @@
 <div class="text-center py-5">
     <h1 class="display-4 text-muted">403</h1>
     <p class="lead">您没有权限访问此页面</p>
-    <a href="{{ url_for('index') }}" class="btn btn-primary">返回首页</a>
+    <p class="text-muted mb-4">可能原因：角色权限不足或会话已过期，请尝试重新登录</p>
+    <a href="javascript:history.back()" class="btn btn-outline-secondary me-2"><i class="bi bi-arrow-left me-1"></i>返回上页</a>
+    <a href="{{ url_for('index') }}" class="btn btn-primary"><i class="bi bi-house me-1"></i>返回首页</a>
 </div>
 {% endblock %}

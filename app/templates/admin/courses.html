@@ -13,7 +13,7 @@
             <td>{% if c.course_type == 'required' %}必修{% elif c.course_type == 'elective' %}选修{% else %}任选{% endif %}</td>
             <td>
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ c.id }}">编辑</button>
-                <form method="post" action="{{ url_for('admin.courses_delete', cid=c.id) }}" style="display:inline" onsubmit="return confirm('确认删除？')">
+                <form method="post" action="{{ url_for('admin.courses_delete', cid=c.id) }}" style="display:inline" onsubmit="return confirm('确认删除课程「{{ c.name }}({{ c.code }})」？此操作不可恢复！')">
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-outline-danger">删除</button>
                 </form>

@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.db import query, execute, insert
 from app.auth.forms import LoginForm, RegisterForm
 from app import User
+from app.helpers import log_action
 
 
 def _unique_student_no():
@@ -46,6 +47,7 @@ def login():
                 'UPDATE users SET last_login = NOW() WHERE id = %s',
                 (user['id'],)
             )
+            log_action('user_login', 'user', user['id'], '用户登录')
             flash('登录成功！', 'success')
             role = user['role']
             return redirect(url_for(f'{role}.dashboard'))
@@ -68,6 +70,10 @@ def register():
     form.class_id.choices = [(c['id'], f"{c['name']} ({c['grade']})") for c in classes_data]
 
     if request.method == 'POST' and form.validate():
+        if form.role.data not in ('student', 'teacher'):
+            flash('非法角色选择', 'danger')
+            return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+
         existing = query('SELECT id FROM users WHERE username=%s', (form.username.data,), one=True)
         if existing:
             flash('用户名已存在', 'danger')
@@ -103,6 +109,7 @@ def register():
                      form.phone.data, form.email.data))
 
             flash('注册成功，请登录', 'success')
+            log_action('user_register', 'user', user_id, f'注册: role={role_name}')
             return redirect(url_for('auth.login'))
         except Exception as e:
             flash(f'注册失败：{str(e)}', 'danger')
@@ -113,6 +120,7 @@ def register():
 @auth_bp.route('/logout')
 @login_required
 def logout():
+    log_action('user_logout', 'user', current_user['id'], '用户退出')
     logout_user()
     flash('已退出登录', 'info')
     return redirect(url_for('auth.login'))
@@ -139,6 +147,11 @@ def profile():
             'SELECT * FROM teachers WHERE user_id = %s',
             (user['id'],), one=True
         )
+    elif role == 'admin':
+        profile_data = query(
+            'SELECT u.username, u.role, u.created_at FROM users u WHERE u.id = %s',
+            (user['id'],), one=True
+        )
 
     if request.method == 'POST':
         new_password = request.form.get('new_password')
@@ -150,17 +163,23 @@ def profile():
                     'UPDATE users SET password_hash = %s WHERE id = %s',
                     (generate_password_hash(new_password), user['id'])
                 )
+                log_action('password_change', 'user', user['id'], '修改密码')
                 flash('密码修改成功', 'success')
 
-        # Update phone/email
-        phone = request.form.get('phone', '')
-        email = request.form.get('email', '')
-        table = 'students' if role == 'student' else 'teachers'
-        execute(
-            f'UPDATE {table} SET phone = %s, email = %s WHERE user_id = %s',
-            (phone, email, user['id'])
-        )
-        flash('个人信息更新成功', 'success')
+        # Update phone/email (only for student/teacher)
+        if role in ('student', 'teacher'):
+            phone = request.form.get('phone', '')
+            email = request.form.get('email', '')
+            table = 'students' if role == 'student' else 'teachers'
+            execute(
+                f'UPDATE {table} SET phone = %s, email = %s WHERE user_id = %s',
+                (phone, email, user['id'])
+            )
+            flash('个人信息更新成功', 'success')
+        elif role == 'admin':
+            if not new_password:
+                flash('管理员仅支持修改密码', 'info')
+
         return redirect(url_for('auth.profile'))
 
     return render_template('auth/profile.html', profile=profile_data)

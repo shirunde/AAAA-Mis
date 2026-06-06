@@ -78,6 +78,10 @@
 <script>
 var tb=document.getElementById('sidebarToggle');
 if(tb){tb.addEventListener('click',function(){document.getElementById('wrapper').classList.toggle('sidebar-collapsed');});}
+// Sidebar active highlighting
+document.querySelectorAll('.sidebar-nav .nav-link').forEach(function(link){
+    if(link.pathname===window.location.pathname){link.classList.add('active');}
+});
 </script>
 {% block extra_js %}{% endblock %}
 </body>
