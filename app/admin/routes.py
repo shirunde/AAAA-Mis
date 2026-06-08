@@ -689,3 +689,74 @@ def academic_alerts():
         search=search,
         total=total, page=page_num, pages=pages,
     )
+
+
+# ---- 教室管理 ----
+@admin_bp.route('/classrooms')
+def classrooms():
+    data = query('SELECT * FROM classrooms ORDER BY building, room_number')
+    buildings = query('SELECT DISTINCT building FROM classrooms ORDER BY building')
+    return render_template('admin/classrooms.html', classrooms=data, buildings=buildings)
+
+
+@admin_bp.route('/classrooms/add', methods=['POST'])
+def classrooms_add():
+    code = request.form['code']
+    name = request.form['name']
+    building = request.form['building']
+    room_number = request.form['room_number']
+    capacity = request.form.get('capacity', type=int)
+
+    execute("""INSERT INTO classrooms (code, name, building, room_number, capacity)
+               VALUES (%s,%s,%s,%s,%s)""",
+            (code, name, building, room_number, capacity))
+    flash('教室添加成功', 'success')
+    log_action('classroom_add', 'classroom', None, f'添加教室: {name}')
+    return redirect(url_for('admin.classrooms'))
+
+
+@admin_bp.route('/classrooms/<int:cid>/edit', methods=['POST'])
+def classrooms_edit(cid):
+    execute("""UPDATE classrooms SET code=%s,name=%s,building=%s,room_number=%s,capacity=%s
+               WHERE id=%s""",
+            (request.form['code'], request.form['name'], request.form['building'],
+             request.form['room_number'], request.form.get('capacity', type=int), cid))
+    flash('教室更新成功', 'success')
+    log_action('classroom_edit', 'classroom', cid, f'更新教室: {request.form["name"]}')
+    return redirect(url_for('admin.classrooms'))
+
+
+@admin_bp.route('/classrooms/<int:cid>/toggle', methods=['POST'])
+def classrooms_toggle(cid):
+    c = query('SELECT is_active FROM classrooms WHERE id=%s', (cid,), one=True)
+    execute('UPDATE classrooms SET is_active=%s WHERE id=%s', (0 if c['is_active'] else 1, cid))
+    flash('教室状态已切换', 'success')
+    log_action('classroom_toggle', 'classroom', cid, '切换教室状态')
+    return redirect(url_for('admin.classrooms'))
+
+
+@admin_bp.route('/classrooms/<int:cid>/delete', methods=['POST'])
+def classrooms_delete(cid):
+    execute('DELETE FROM classrooms WHERE id=%s', (cid,))
+    flash('教室已删除', 'info')
+    log_action('classroom_delete', 'classroom', cid, f'删除教室ID={cid}')
+    return redirect(url_for('admin.classrooms'))
+
+
+# ---- 时间段管理 ----
+@admin_bp.route('/time-slots')
+def time_slots():
+    data = query('SELECT * FROM time_slots ORDER BY day_of_week, period_num')
+    day_names = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    return render_template('admin/time_slots.html', slots=data, day_names=day_names)
+
+
+@admin_bp.route('/time-slots/<int:sid>/edit', methods=['POST'])
+def time_slots_edit(sid):
+    execute("""UPDATE time_slots SET start_time=%s,end_time=%s,label=%s
+               WHERE id=%s""",
+            (request.form['start_time'], request.form['end_time'],
+             request.form['label'], sid))
+    flash('时间段更新成功', 'success')
+    log_action('timeslot_edit', 'timeslot', sid, f'更新时间段ID={sid}')
+    return redirect(url_for('admin.time_slots'))

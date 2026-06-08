@@ -109,19 +109,21 @@ def courses():
         rows = query('SELECT course_offering_id FROM enrollments WHERE student_id=%s AND status=%s',
                      (sid, 'enrolled'))
         enrolled_ids = {r['course_offering_id'] for r in rows}
-        # 用 parse_schedule_slots 做智能冲突检测（"周一1-2节"与"周一第1-2节"视为冲突）
-        enrolled_schedules = query("""SELECT co.id, co.schedule FROM enrollments e
-                             JOIN course_offerings co ON e.course_offering_id = co.id
-                             WHERE e.student_id = %s AND e.status = 'enrolled'
-                               AND co.schedule IS NOT NULL AND co.schedule != ''""", (sid,))
-        enrolled_slots = set()
-        for es in enrolled_schedules:
-            enrolled_slots |= parse_schedule_slots(es['schedule'])
+        
+        # 使用 offering_schedules 表做智能冲突检测
+        enrolled_time_slot_ids = query("""SELECT DISTINCT os.time_slot_id FROM enrollments e
+                             JOIN offering_schedules os ON os.course_offering_id = e.course_offering_id
+                             WHERE e.student_id = %s AND e.status = 'enrolled'""", (sid,))
+        enrolled_slot_set = {r['time_slot_id'] for r in enrolled_time_slot_ids}
+        
         # 对当前页开课做冲突检测
         for o in data.get('items', []):
-            if o['id'] not in enrolled_ids and o.get('schedule'):
-                o_slots = parse_schedule_slots(o['schedule'])
-                if o_slots & enrolled_slots:
+            if o['id'] not in enrolled_ids:
+                # 获取该开课的时间段
+                offering_slots = query("SELECT time_slot_id FROM offering_schedules WHERE course_offering_id=%s", (o['id'],))
+                offering_slot_set = {r['time_slot_id'] for r in offering_slots}
+                
+                if offering_slot_set & enrolled_slot_set:
                     conflict_offering_ids.add(o['id'])
 
     return render_template('student/courses.html', **data, search=search, type=course_type,
@@ -142,6 +144,11 @@ def course_detail(oid):
         WHERE co.id=%s AND co.status='published'""", (oid,), one=True)
     if not detail:
         return jsonify({'error': 'not found'}), 404
+    
+    # Get schedule from offering_schedules table
+    schedule_info = get_offering_schedule(oid)
+    detail['schedule'] = schedule_info if schedule_info != '未安排' else None
+    
     return jsonify(detail)
 
 

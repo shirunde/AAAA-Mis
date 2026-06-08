@@ -63,6 +63,12 @@ def create_app():
     from app.student.routes import student_bp
     app.register_blueprint(student_bp, url_prefix='/student')
 
+    # Register template helper functions
+    from app import helpers
+    @app.template_global()
+    def get_offering_schedule(offering_id):
+        return helpers.get_offering_schedule(offering_id)
+
     # Home route
     @app.route('/')
     def index():

@@ -69,20 +69,47 @@ def dashboard():
 def apply_offering():
     tid = get_teacher_id()
     if request.method == 'POST':
-        execute(
-            """INSERT INTO course_offerings (course_id, teacher_id, semester_id, max_students, classroom, schedule, apply_reason)
-               VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+        # 获取时间段和教室列表
+        time_slot_ids = request.form.getlist('time_slots', type=int)
+        classroom_id = request.form.get('classroom_id', type=int)
+
+        if not time_slot_ids or not classroom_id:
+            flash('请选择上课时间和教室', 'danger')
+            courses = query('SELECT * FROM courses ORDER BY id')
+            semesters = query('SELECT * FROM semesters ORDER BY id DESC')
+            time_slots = query('SELECT * FROM time_slots ORDER BY day_of_week, period_num')
+            classrooms = query('SELECT * FROM classrooms WHERE is_active=1 ORDER BY code')
+            return render_template('teacher/apply_offering.html',
+                                 courses=courses, semesters=semesters,
+                                 time_slots=time_slots, classrooms=classrooms)
+
+        # 插入开课记录
+        offering_id = insert(
+            """INSERT INTO course_offerings (course_id, teacher_id, semester_id, max_students, apply_reason)
+               VALUES (%s,%s,%s,%s,%s)""",
             (request.form['course_id'], tid, request.form['semester_id'],
-             request.form['max_students'], request.form.get('classroom', ''),
-             request.form.get('schedule', ''), request.form.get('apply_reason', ''))
+             request.form['max_students'], request.form.get('apply_reason', ''))
         )
+
+        # 插入时间表
+        for slot_id in time_slot_ids:
+            execute(
+                """INSERT INTO offering_schedules (course_offering_id, time_slot_id, classroom_id)
+                   VALUES (%s,%s,%s)""",
+                (offering_id, slot_id, classroom_id)
+            )
+
         flash('开课申请已提交，请等待管理员审核', 'success')
-        log_action('offering_apply', 'offering', None, f'申请开课: course_id={request.form["course_id"]}')
+        log_action('offering_apply', 'offering', offering_id, f'申请开课: course_id={request.form["course_id"]}')
         return redirect(url_for('teacher.my_offerings'))
 
     courses = query('SELECT * FROM courses ORDER BY id')
     semesters = query('SELECT * FROM semesters ORDER BY id DESC')
-    return render_template('teacher/apply_offering.html', courses=courses, semesters=semesters)
+    time_slots = query('SELECT * FROM time_slots ORDER BY day_of_week, period_num')
+    classrooms = query('SELECT * FROM classrooms WHERE is_active=1 ORDER BY code')
+    return render_template('teacher/apply_offering.html',
+                         courses=courses, semesters=semesters,
+                         time_slots=time_slots, classrooms=classrooms)
 
 
 @teacher_bp.route('/my-offerings')

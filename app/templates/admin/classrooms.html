@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}教室管理{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-building"></i> 教室管理</h4>
+
+<!-- 添加按钮 -->
+<button class="btn btn-primary btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#addModal">
+    <i class="bi bi-plus-lg"></i> 添加教室
+</button>
+
+<!-- 教室列表表格 -->
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-bordered table-hover mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>教学楼</th>
+                    <th>房间号</th>
+                    <th>容量</th>
+                    <th>状态</th>
+                    <th style="width:180px;">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in classrooms %}
+                <tr>
+                    <td>{{ c.id }}</td>
+                    <td><code>{{ c.code }}</code></td>
+                    <td>{{ c.name }}</td>
+                    <td>{{ c.building }}</td>
+                    <td>{{ c.room_number }}</td>
+                    <td>{{ c.capacity or '-' }}</td>
+                    <td>
+                        <span class="badge bg-{{ 'success' if c.is_active else 'secondary' }}">
+                            {{ '启用' if c.is_active else '禁用' }}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editModal{{ c.id }}">编辑</button>
+                        <form method="post" action="{{ url_for('admin.classrooms_toggle', cid=c.id) }}"
+                              style="display:inline">
+                            {% include '_csrf_field.html' %}
+                            <button type="submit" class="btn btn-sm btn-{{ 'warning' if c.is_active else 'success' }}">
+                                {{ '禁用' if c.is_active else '启用' }}
+                            </button>
+                        </form>
+                        <form method="post" action="{{ url_for('admin.classrooms_delete', cid=c.id) }}"
+                              style="display:inline"
+                              onsubmit="return confirm('确定删除此教室?')">
+                            {% include '_csrf_field.html' %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                        </form>
+                    </td>
+                </tr>
+
+                <!-- 编辑模态框(每行一个) -->
+                <div class="modal fade" id="editModal{{ c.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="post" action="{{ url_for('admin.classrooms_edit', cid=c.id) }}">
+                                {% include '_csrf_field.html' %}
+                                <div class="modal-header">
+                                    <h5>编辑教室</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">代码</label>
+                                        <input type="text" name="code" class="form-control"
+                                               value="{{ c.code }}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">名称</label>
+                                        <input type="text" name="name" class="form-control"
+                                               value="{{ c.name }}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">教学楼</label>
+                                        <select name="building" class="form-select" required>
+                                            <option value="">-- 选择 --</option>
+                                            <option value="逸夫楼" {{ 'selected' if c.building == '逸夫楼' }}>逸夫楼</option>
+                                            <option value="实验楼" {{ 'selected' if c.building == '实验楼' }}>实验楼</option>
+                                            <option value="教学楼" {{ 'selected' if c.building == '教学楼' }}>教学楼</option>
+                                            <option value="其他" {{ 'selected' if c.building == '其他' }}>其他</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">房间号</label>
+                                        <input type="text" name="room_number" class="form-control"
+                                               value="{{ c.room_number }}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">容量</label>
+                                        <input type="number" name="capacity" class="form-control"
+                                               value="{{ c.capacity or 60 }}">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 添加模态框 -->
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('admin.classrooms_add') }}">
+                {% include '_csrf_field.html' %}
+                <div class="modal-header">
+                    <h5>添加教室</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">代码</label>
+                        <input type="text" name="code" class="form-control"
+                               placeholder="如:yf101" required>
+                        <small class="text-muted">格式: 建筑缩写+房间号</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">名称</label>
+                        <input type="text" name="name" class="form-control"
+                               placeholder="如:逸夫楼101" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">教学楼</label>
+                        <select name="building" class="form-select" required>
+                            <option value="">-- 选择 --</option>
+                            <option value="逸夫楼">逸夫楼</option>
+                            <option value="实验楼">实验楼</option>
+                            <option value="教学楼">教学楼</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">房间号</label>
+                        <input type="text" name="room_number" class="form-control"
+                               placeholder="如:101" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">容量</label>
+                        <input type="number" name="capacity" class="form-control" value="60">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -73,21 +73,21 @@ main_block: BEGIN
         LEAVE main_block;
     END IF;
 
-    -- 检查时间冲突
-    IF v_schedule IS NOT NULL AND v_schedule != '' THEN
-        IF EXISTS (
-            SELECT 1 FROM enrollments e
-            JOIN course_offerings co ON e.course_offering_id = co.id
-            WHERE e.student_id = p_student_id
-              AND e.status = 'enrolled'
-              AND co.semester_id = v_semester_id
-              AND co.schedule = v_schedule
-        ) THEN
-            SET p_result = 2;
-            SET p_message = CONCAT('上课时间冲突：', v_schedule);
-            ROLLBACK;
-            LEAVE main_block;
-        END IF;
+    -- 检查时间冲突(使用 offering_schedules 表)
+    IF EXISTS (
+        SELECT 1 FROM enrollments e
+        JOIN course_offerings co ON e.course_offering_id = co.id
+        JOIN offering_schedules os_new ON os_new.course_offering_id = p_offering_id
+        JOIN offering_schedules os_exist ON os_exist.course_offering_id = co.id
+        WHERE e.student_id = p_student_id
+          AND e.status = 'enrolled'
+          AND co.semester_id = v_semester_id
+          AND os_new.time_slot_id = os_exist.time_slot_id
+    ) THEN
+        SET p_result = 2;
+        SET p_message = '该时间段与您已选课程冲突';
+        ROLLBACK;
+        LEAVE main_block;
     END IF;
 
     -- 容量检查（FOR UPDATE已锁行，此处COUNT为准确值）
@@ -285,7 +285,7 @@ CREATE PROCEDURE sp_approve_course_offering(
     OUT p_result INT,
     OUT p_message VARCHAR(200)
 )
-BEGIN
+main_block: BEGIN
     DECLARE v_status VARCHAR(20);
 
     SELECT status INTO v_status
@@ -299,6 +299,41 @@ BEGIN
         SET p_result = 2;
         SET p_message = '该申请已审核过，不可重复审核';
     ELSE
+        -- 如果是通过,检查教师和时间冲突
+        IF p_action = 'approved' THEN
+            -- 检查教师时间冲突
+            IF EXISTS (
+                SELECT 1 FROM course_offerings co_existing
+                JOIN offering_schedules os_new ON os_new.course_offering_id = p_offering_id
+                JOIN offering_schedules os_exist ON os_exist.course_offering_id = co_existing.id
+                WHERE co_existing.teacher_id = (SELECT teacher_id FROM course_offerings WHERE id = p_offering_id)
+                  AND co_existing.semester_id = (SELECT semester_id FROM course_offerings WHERE id = p_offering_id)
+                  AND co_existing.status IN ('approved', 'published')
+                  AND co_existing.id != p_offering_id
+                  AND os_new.time_slot_id = os_exist.time_slot_id
+            ) THEN
+                SET p_result = 3;
+                SET p_message = '该教师在此时间段已有其他课程';
+                LEAVE main_block;
+            END IF;
+
+            -- 检查教室时间冲突
+            IF EXISTS (
+                SELECT 1 FROM course_offerings co_existing
+                JOIN offering_schedules os_new ON os_new.course_offering_id = p_offering_id
+                JOIN offering_schedules os_exist ON os_exist.course_offering_id = co_existing.id
+                WHERE co_existing.semester_id = (SELECT semester_id FROM course_offerings WHERE id = p_offering_id)
+                  AND co_existing.status IN ('approved', 'published')
+                  AND co_existing.id != p_offering_id
+                  AND os_new.classroom_id = os_exist.classroom_id
+                  AND os_new.time_slot_id = os_exist.time_slot_id
+            ) THEN
+                SET p_result = 4;
+                SET p_message = '该教室在此时间段已被占用';
+                LEAVE main_block;
+            END IF;
+        END IF;
+
         UPDATE course_offerings
            SET status = p_action,
                review_comment = p_comment,
