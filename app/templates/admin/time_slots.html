@@ -29,15 +29,13 @@
                 {% for ts in slots %}
                     {% if ts.day_of_week != current_day %}
                         {% if not loop.first %}</tbody><tbody>{% endif %}
+                        <tr class="table-secondary">
+                            <td colspan="7"><strong>{{ day_names[ts.day_of_week] }}</strong></td>
+                        </tr>
                         {% set current_day = ts.day_of_week %}
                     {% endif %}
                     <tr>
                         <td>{{ ts.id }}</td>
-                        <td>
-                            {% if ts.day_of_week != loop.previtem.day_of_week if loop.previtem else true %}
-                                <strong>{{ day_names[ts.day_of_week] }}</strong>
-                            {% endif %}
-                        </td>
                         <td>{{ ts.period_num }}</td>
                         <td><code>{{ ts.start_time }}</code></td>
                         <td><code>{{ ts.end_time }}</code></td>
