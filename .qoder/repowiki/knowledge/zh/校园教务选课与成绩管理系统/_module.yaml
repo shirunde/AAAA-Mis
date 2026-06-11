@@ -1,0 +1,72 @@
+schema_version: 1
+module_path: ""
+title: 校园教务选课与成绩管理系统
+scope:
+    - README.md
+    - .gitignore
+    - requirements.txt
+    - app.py
+    - config.py
+    - heku_solver.py
+    - test_input.txt
+    - app/
+    - sql/
+    - static/
+    - .env.example
+    - app\__init__.py
+    - app\admin\__init__.py
+    - app\admin\forms.py
+    - app\admin\routes.py
+    - app\auth\__init__.py
+    - app\auth\forms.py
+    - app\auth\routes.py
+    - app\db.py
+    - app\decorators.py
+    - app\student\__init__.py
+    - app\student\forms.py
+    - app\student\routes.py
+    - app\teacher\__init__.py
+    - app\teacher\forms.py
+    - app\teacher\routes.py
+    - app\templates\403.html
+    - app\templates\404.html
+    - app\templates\500.html
+    - app\templates\_csrf_field.html
+    - app\templates\_pagination.html
+    - app\templates\admin\classes.html
+    - app\templates\admin\courses.html
+    - app\templates\admin\dashboard.html
+    - app\templates\admin\grades_review.html
+    - app\templates\admin\logs.html
+    - app\templates\admin\majors.html
+    - app\templates\admin\offerings.html
+    - app\templates\admin\selection_periods.html
+    - app\templates\admin\semesters.html
+    - app\templates\admin\statistics.html
+    - app\templates\admin\students.html
+    - app\templates\admin\teachers.html
+    - app\templates\auth\login.html
+    - app\templates\auth\profile.html
+    - app\templates\auth\register.html
+    - app\templates\base.html
+    - app\templates\base_simple.html
+    - app\templates\student\courses.html
+    - app\templates\student\dashboard.html
+    - app\templates\student\grades.html
+    - app\templates\student\schedule.html
+    - app\templates\student\transcript.html
+    - app\templates\teacher\apply_offering.html
+    - app\templates\teacher\dashboard.html
+    - app\templates\teacher\grade_stats.html
+    - app\templates\teacher\my_offerings.html
+    - app\templates\teacher\offering_students.html
+    - cookie.txt
+    - sql\01_schema.sql
+    - sql\02_seed.sql
+    - sql\03_procedures.sql
+    - sql\04_views.sql
+    - static\css\style.css
+    - static\js\main.js
+source_files: []
+depends_on: []
+related_to: []

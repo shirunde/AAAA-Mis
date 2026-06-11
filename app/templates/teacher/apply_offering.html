@@ -48,12 +48,12 @@
                 <label class="form-label">上课教室</label>
                 <select name="classroom_id" class="form-select" required>
                     <option value="">-- 选择教室 --</option>
-                    {% set current_building = None %}
+                    {% set ns = namespace(current_building=None) %}
                     {% for c in classrooms %}
-                        {% if c.building != current_building %}
+                        {% if c.building != ns.current_building %}
                             {% if not loop.first %}</optgroup>{% endif %}
                             <optgroup label="{{ c.building }}">
-                            {% set current_building = c.building %}
+                            {% set ns.current_building = c.building %}
                         {% endif %}
                         <option value="{{ c.id }}">{{ c.name }} (容量:{{ c.capacity or '?' }})</option>
                     {% endfor %}
@@ -64,12 +64,12 @@
             <div class="mb-3">
                 <label class="form-label">上课时间 <small class="text-muted">(可多选,至少选择一个)</small></label>
                 <div class="border rounded p-3" style="max-height:350px;overflow-y:auto;">
-                    {% set current_day = None %}
+                    {% set ns2 = namespace(current_day=None) %}
                     {% for ts in time_slots %}
-                        {% if ts.day_of_week != current_day %}
+                        {% if ts.day_of_week != ns2.current_day %}
                             {% if not loop.first %}<hr class="my-2">{% endif %}
                             <h6 class="mb-2 text-primary">{{ ['','周一','周二','周三','周四','周五','周六','周日'][ts.day_of_week] }}</h6>
-                            {% set current_day = ts.day_of_week %}
+                            {% set ns2.current_day = ts.day_of_week %}
                         {% endif %}
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="time_slots"

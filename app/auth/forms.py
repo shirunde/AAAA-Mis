@@ -30,7 +30,7 @@ class RegisterForm(Form):
     # 学生/教师共用基本信息
     name = StringField('姓名', validators=[DataRequired('请输入姓名')])
     gender = SelectField('性别', choices=[('M', '男'), ('F', '女')])
-    major_id = SelectField('专业', choices=[], validators=[Optional()])
-    class_id = SelectField('班级', choices=[], validators=[Optional()])
+    major_id = SelectField('专业', choices=[], coerce=int, validators=[Optional()])
+    class_id = SelectField('班级', choices=[], coerce=int, validators=[Optional()])
     phone = StringField('电话', validators=[Optional(), Length(max=20)])
     email = StringField('邮箱', validators=[Optional(), Length(max=100)])

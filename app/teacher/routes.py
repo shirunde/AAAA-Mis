@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 from flask_login import login_required, current_user
 from app.decorators import role_required
-from app.db import query, execute
+from app.db import query, execute, insert, get_conn
 from app.helpers import log_action
 
 teacher_bp = Blueprint('teacher', __name__)
