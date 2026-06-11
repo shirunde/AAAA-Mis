@@ -54,7 +54,7 @@
             <span class="ms-2 fw-bold">{% block page_title %}教务管理系统{% endblock %}</span>
             <div class="ms-auto dropdown">
                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                    <i class="bi bi-person-circle"></i> {{ current_user.get('username') }}</a>
+                    <i class="bi bi-person-circle"></i> {{ current_user.get('username') if current_user.is_authenticated else '未登录' }}</a>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="bi bi-gear me-2"></i>个人信息</a></li>
                     <li><hr class="dropdown-divider"></li>

@@ -75,7 +75,7 @@
                             <input class="form-check-input" type="checkbox" name="time_slots"
                                    value="{{ ts.id }}" id="slot_{{ ts.id }}">
                             <label class="form-check-label" for="slot_{{ ts.id }}">
-                                {{ ts.label }} ({{ str(ts.start_time)[:5] if ts.start_time else 'N/A' }}-{{ str(ts.end_time)[:5] if ts.end_time else 'N/A' }})
+                                {{ ts.label }} ({{ ts.start_time|string|truncate(5, true, '') }}-{{ ts.end_time|string|truncate(5, true, '') }})
                             </label>
                         </div>
                     {% endfor %}
