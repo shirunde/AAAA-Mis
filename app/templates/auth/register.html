@@ -6,12 +6,18 @@
         <div class="card shadow">
             <div class="card-body p-4">
                 <h3 class="text-center mb-4">用户注册</h3>
-                <form method="post" id="registerForm">
+                <form method="post" id="registerForm" novalidate>
                     {% include '_csrf_field.html' %}
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">用户名</label>
-                            <input type="text" name="username" class="form-control" required value="{{ form.username.data if form.username.data else '' }}">
+                            <input type="text" name="username" class="form-control" required
+                                   autocomplete="username"
+                                   value="{{ form.username.data if form.username.data else '' }}">
+                            {% if form.username.errors %}
+                                <div class="text-danger small">{{ form.username.errors[0] }}</div>
+                            {% endif %}
+                            <div class="form-text">3-50位字母、数字或下划线</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">角色</label>
@@ -24,53 +30,83 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">密码</label>
-                            <input type="password" name="password" class="form-control" required>
+                            <input type="password" name="password" id="passwordInput" class="form-control" required
+                                   autocomplete="new-password" minlength="6" maxlength="30">
+                            {% if form.password.errors %}
+                                <div class="text-danger small">{{ form.password.errors[0] }}</div>
+                            {% endif %}
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">确认密码</label>
-                            <input type="password" name="password2" class="form-control" required>
+                            <input type="password" name="password2" id="password2Input" class="form-control" required
+                                   autocomplete="new-password" minlength="6" maxlength="30">
+                            {% if form.password2.errors %}
+                                <div class="text-danger small">{{ form.password2.errors[0] }}</div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">姓名</label>
-                            <input type="text" name="name" class="form-control" required value="{{ form.name.data if form.name.data else '' }}">
+                            <input type="text" name="name" class="form-control" required
+                                   value="{{ form.name.data if form.name.data else '' }}">
+                            {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors[0] }}</div>
+                            {% endif %}
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">性别</label>
                             <select name="gender" class="form-select">
-                                <option value="M">男</option>
-                                <option value="F">女</option>
+                                <option value="M" {% if form.gender.data == 'M' %}selected{% endif %}>男</option>
+                                <option value="F" {% if form.gender.data == 'F' %}selected{% endif %}>女</option>
                             </select>
                         </div>
                     </div>
-                    <!-- Student-only fields -->
                     <div id="studentFields">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">专业</label>
+                                <label class="form-label">专业 <span class="text-danger">*</span></label>
                                 <select name="major_id" id="majorSelect" class="form-select">
                                     <option value="">-- 选择专业 --</option>
-                                    {% for m in majors %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+                                    {% for m in majors %}
+                                    <option value="{{ m.id }}"
+                                        {% if form.major_id.data is not none and form.major_id.data|int == m.id|int %}selected{% endif %}>
+                                        {{ m.name }}
+                                    </option>
+                                    {% endfor %}
                                 </select>
+                                {% if form.major_id.errors %}
+                                    <div class="text-danger small">{{ form.major_id.errors[0] }}</div>
+                                {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">班级</label>
+                                <label class="form-label">班级 <span class="text-danger">*</span></label>
                                 <select name="class_id" id="classSelect" class="form-select">
                                     <option value="">-- 选择班级 --</option>
-                                    {% for c in classes %}<option value="{{ c.id }}" data-major="{{ c.major_id }}">{{ c.name }} ({{ c.grade }})</option>{% endfor %}
+                                    {% for c in classes %}
+                                    <option value="{{ c.id }}" data-major="{{ c.major_id }}"
+                                        {% if form.class_id.data is not none and form.class_id.data|int == c.id|int %}selected{% endif %}>
+                                        {{ c.name }} ({{ c.grade }})
+                                    </option>
+                                    {% endfor %}
                                 </select>
+                                {% if form.class_id.errors %}
+                                    <div class="text-danger small">{{ form.class_id.errors[0] }}</div>
+                                {% endif %}
+                                <div id="classHint" class="form-text text-warning d-none">切换专业后请重新选择班级</div>
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">电话</label>
-                            <input type="text" name="phone" class="form-control" value="{{ form.phone.data if form.phone.data else '' }}">
+                            <input type="text" name="phone" class="form-control"
+                                   value="{{ form.phone.data if form.phone.data else '' }}">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">邮箱</label>
-                            <input type="email" name="email" class="form-control" value="{{ form.email.data if form.email.data else '' }}">
+                            <input type="email" name="email" class="form-control"
+                                   value="{{ form.email.data if form.email.data else '' }}">
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">注 册</button>
@@ -84,18 +120,79 @@
 
 {% block extra_js %}
 <script>
-document.getElementById('roleSelect').addEventListener('change', function() {
-    document.getElementById('studentFields').style.display = this.value === 'student' ? '' : 'none';
-});
-document.getElementById('roleSelect').dispatchEvent(new Event('change'));
+(function () {
+    var roleSelect = document.getElementById('roleSelect');
+    var majorSelect = document.getElementById('majorSelect');
+    var classSelect = document.getElementById('classSelect');
+    var classHint = document.getElementById('classHint');
+    var form = document.getElementById('registerForm');
+    var pwdKey = 'register_pwd_draft';
 
-document.getElementById('majorSelect').addEventListener('change', function() {
-    var majorId = this.value;
-    document.querySelectorAll('#classSelect option').forEach(function(opt) {
-        if (!opt.value) return;
-        opt.style.display = (majorId === '' || opt.dataset.major === majorId) ? '' : 'none';
+    function isStudent() {
+        return roleSelect.value === 'student';
+    }
+
+    function syncStudentFields() {
+        var show = isStudent();
+        document.getElementById('studentFields').style.display = show ? '' : 'none';
+        majorSelect.required = show;
+        classSelect.required = show;
+        majorSelect.disabled = !show;
+        classSelect.disabled = !show;
+    }
+
+    function filterClasses(resetIfInvalid) {
+        var majorId = majorSelect.value;
+        var selected = classSelect.value;
+        var stillValid = false;
+
+        Array.prototype.forEach.call(classSelect.options, function (opt) {
+            if (!opt.value) {
+                opt.hidden = false;
+                return;
+            }
+            var match = !majorId || opt.dataset.major === majorId;
+            opt.hidden = !match;
+            if (match && opt.value === selected) {
+                stillValid = true;
+            }
+        });
+
+        if (resetIfInvalid && selected && !stillValid) {
+            classSelect.value = '';
+            classHint.classList.remove('d-none');
+        }
+    }
+
+    roleSelect.addEventListener('change', function () {
+        syncStudentFields();
+        filterClasses(false);
     });
-    document.getElementById('classSelect').value = '';
-});
+
+    majorSelect.addEventListener('change', function () {
+        filterClasses(true);
+    });
+
+    form.addEventListener('submit', function () {
+        try {
+            sessionStorage.setItem(pwdKey, JSON.stringify({
+                p: document.getElementById('passwordInput').value,
+                p2: document.getElementById('password2Input').value
+            }));
+        } catch (e) {}
+    });
+
+    try {
+        var draft = JSON.parse(sessionStorage.getItem(pwdKey) || 'null');
+        if (draft && draft.p) {
+            document.getElementById('passwordInput').value = draft.p;
+            document.getElementById('password2Input').value = draft.p2 || draft.p;
+            sessionStorage.removeItem(pwdKey);
+        }
+    } catch (e) {}
+
+    syncStudentFields();
+    filterClasses(false);
+})();
 </script>
 {% endblock %}

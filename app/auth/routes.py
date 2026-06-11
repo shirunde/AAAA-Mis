@@ -5,7 +5,7 @@ import random
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.db import query, execute, insert
+from app.db import query, execute, insert, get_conn
 from app.auth.forms import LoginForm, RegisterForm
 from app import User
 from app.helpers import log_action
@@ -66,10 +66,19 @@ def register():
     # Load majors & classes for dropdowns
     majors_data = query('SELECT * FROM majors ORDER BY id')
     classes_data = query('SELECT * FROM classes ORDER BY id')
-    form.major_id.choices = [(m['id'], m['name']) for m in majors_data]
-    form.class_id.choices = [(c['id'], f"{c['name']} ({c['grade']})") for c in classes_data]
+    form.major_id.choices = [('', '-- 选择专业 --')] + [(m['id'], m['name']) for m in majors_data]
+    form.class_id.choices = [('', '-- 选择班级 --')] + [(c['id'], f"{c['name']} ({c['grade']})") for c in classes_data]
 
-    if request.method == 'POST' and form.validate():
+    if request.method == 'POST':
+        if not form.validate():
+            for field_name, errors in form.errors.items():
+                label = getattr(form, field_name).label.text
+                for err in errors:
+                    flash(f'{label}：{err}', 'danger')
+            if form.password.data or form.password2.data:
+                flash('密码需重新输入（浏览器安全限制，其他已填信息已保留）', 'warning')
+            return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+
         if form.role.data not in ('student', 'teacher'):
             flash('非法角色选择', 'danger')
             return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
@@ -77,42 +86,68 @@ def register():
         existing = query('SELECT id FROM users WHERE username=%s', (form.username.data,), one=True)
         if existing:
             flash('用户名已存在', 'danger')
+            if form.password.data or form.password2.data:
+                flash('密码需重新输入（浏览器安全限制，其他已填信息已保留）', 'warning')
             return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
 
+        if form.role.data == 'student':
+            cls = query(
+                'SELECT id, major_id FROM classes WHERE id=%s',
+                (form.class_id.data,), one=True
+            )
+            if not cls:
+                flash('班级：请选择有效班级', 'danger')
+                return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+            if cls['major_id'] != form.major_id.data:
+                flash('班级：所选班级与专业不匹配，请重新选择', 'danger')
+                return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+
         try:
-            user_id = insert(
-                """INSERT INTO users (username, password_hash, role) VALUES (%s,%s,%s)""",
-                (form.username.data, generate_password_hash(form.password.data), form.role.data))
+            conn = get_conn()
+            with conn.cursor() as cur:
+                cur.execute(
+                    'INSERT INTO users (username, password_hash, role) VALUES (%s,%s,%s)',
+                    (form.username.data, generate_password_hash(form.password.data), form.role.data)
+                )
+                user_id = cur.lastrowid
+                role_name = form.role.data
 
-            role_name = form.role.data
-            if role_name == 'student':
-                student_no = _unique_student_no()
-                if not student_no:
-                    flash('学号生成失败，请稍后重试', 'danger')
-                    return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
-                enrollment_year = datetime.now().year
-                insert(
-                    """INSERT INTO students (user_id,student_no,name,gender,major_id,class_id,enrollment_year,phone,email)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (user_id, student_no, form.name.data, form.gender.data,
-                     form.major_id.data or 1, form.class_id.data or 1,
-                     enrollment_year, form.phone.data, form.email.data))
-            else:
-                teacher_no = _unique_teacher_no()
-                if not teacher_no:
-                    flash('工号生成失败，请稍后重试', 'danger')
-                    return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
-                insert(
-                    """INSERT INTO teachers (user_id,teacher_no,name,gender,phone,email)
-                       VALUES (%s,%s,%s,%s,%s,%s)""",
-                    (user_id, teacher_no, form.name.data, form.gender.data,
-                     form.phone.data, form.email.data))
-
-            flash('注册成功，请登录', 'success')
-            log_action('user_register', 'user', user_id, f'注册: role={role_name}')
-            return redirect(url_for('auth.login'))
+                if role_name == 'student':
+                    student_no = _unique_student_no()
+                    if not student_no:
+                        conn.rollback()
+                        flash('学号生成失败，请稍后重试', 'danger')
+                        return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+                    enrollment_year = datetime.now().year
+                    cur.execute(
+                        """INSERT INTO students (user_id,student_no,name,gender,major_id,class_id,enrollment_year,phone,email)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (user_id, student_no, form.name.data, form.gender.data,
+                         form.major_id.data, form.class_id.data,
+                         enrollment_year, form.phone.data or None, form.email.data or None)
+                    )
+                else:
+                    teacher_no = _unique_teacher_no()
+                    if not teacher_no:
+                        conn.rollback()
+                        flash('工号生成失败，请稍后重试', 'danger')
+                        return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+                    cur.execute(
+                        """INSERT INTO teachers (user_id,teacher_no,name,gender,phone,email)
+                           VALUES (%s,%s,%s,%s,%s,%s)""",
+                        (user_id, teacher_no, form.name.data, form.gender.data,
+                         form.phone.data or None, form.email.data or None)
+                    )
+                conn.commit()
         except Exception as e:
+            conn = get_conn()
+            conn.rollback()
             flash(f'注册失败：{str(e)}', 'danger')
+            return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
+
+        flash('注册成功，请登录', 'success')
+        log_action('user_register', 'user', user_id, f'注册: role={role_name}')
+        return redirect(url_for('auth.login'))
 
     return render_template('auth/register.html', form=form, majors=majors_data, classes=classes_data)
 

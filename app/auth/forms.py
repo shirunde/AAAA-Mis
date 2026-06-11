@@ -1,6 +1,21 @@
 """认证模块表单"""
-from wtforms import Form, StringField, PasswordField, SelectField, ValidationError
-from wtforms.validators import DataRequired, Length, EqualTo, Regexp, Optional
+from wtforms import Form, StringField, PasswordField, SelectField
+from wtforms.validators import DataRequired, Length, EqualTo, Regexp, Optional, ValidationError
+
+
+def _optional_int(value):
+    """SelectField 空选项兼容：'' -> None，避免 coerce=int 校验失败"""
+    if value is None or value == '':
+        return None
+    return int(value)
+
+
+def _require_student_fields(form, field):
+    """学生注册时必须选择专业与班级；教师角色跳过"""
+    if form.role.data != 'student':
+        return
+    if field.data is None:
+        raise ValidationError('请选择' + field.label.text)
 
 
 class LoginForm(Form):
@@ -30,7 +45,9 @@ class RegisterForm(Form):
     # 学生/教师共用基本信息
     name = StringField('姓名', validators=[DataRequired('请输入姓名')])
     gender = SelectField('性别', choices=[('M', '男'), ('F', '女')])
-    major_id = SelectField('专业', choices=[], coerce=int, validators=[Optional()])
-    class_id = SelectField('班级', choices=[], coerce=int, validators=[Optional()])
+    major_id = SelectField('专业', choices=[], coerce=_optional_int,
+                           validators=[_require_student_fields])
+    class_id = SelectField('班级', choices=[], coerce=_optional_int,
+                           validators=[_require_student_fields])
     phone = StringField('电话', validators=[Optional(), Length(max=20)])
     email = StringField('邮箱', validators=[Optional(), Length(max=100)])
