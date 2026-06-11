@@ -10,7 +10,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-{% set role = current_user.get('role') %}
+{% set role = current_user.get('role') if current_user.is_authenticated else None %}
 <div class="d-flex" id="wrapper">
     <div class="sidebar bg-dark text-white" id="sidebar">
         <div class="sidebar-header p-3">

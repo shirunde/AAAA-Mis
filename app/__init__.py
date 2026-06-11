@@ -93,6 +93,12 @@ def create_app():
     @app.errorhandler(500)
     def server_error(e):
         from flask import render_template
+        # Temporarily show detailed error for debugging
+        import traceback
+        print("=" * 80)
+        print("SERVER ERROR DETAILS:")
+        traceback.print_exc()
+        print("=" * 80)
         return render_template('500.html'), 500
 
     return app
