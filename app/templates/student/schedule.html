@@ -2,45 +2,65 @@
 {% block title %}我的课表{% endblock %}{% block page_title %}我的课表{% endblock %}
 {% block extra_css %}
 <style>
-.schedule-grid { display: grid; grid-template-columns: 80px repeat(5, 1fr); gap: 2px; background: #dee2e6; border: 1px solid #dee2e6; }
-.schedule-grid > div { background: #fff; min-height: 70px; padding: 6px; font-size: 0.8rem; }
+.schedule-grid { display: grid; grid-template-columns: 90px repeat(5, 1fr); gap: 2px; background: #dee2e6; border: 1px solid #dee2e6; }
+.schedule-grid > div { background: #fff; min-height: 72px; padding: 6px; font-size: 0.78rem; }
 .schedule-header { background: #343a40 !important; color: #fff; font-weight: 600; text-align: center; padding: 8px 4px; }
-.schedule-time { background: #f8f9fa !important; font-weight: 600; text-align: center; display: flex; align-items: center; justify-content: center; color: #6c757d; }
+.schedule-time { background: #f8f9fa !important; font-weight: 600; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #6c757d; font-size: 0.72rem; }
 .schedule-cell.course { cursor: pointer; border-left: 3px solid #0d6efd; }
 .schedule-cell.course:hover { background: #e7f1ff; }
 .schedule-cell .course-name { font-weight: 600; color: #0d6efd; }
 .schedule-cell .course-info { color: #6c757d; }
-@media (max-width: 768px) { .schedule-grid { font-size: 0.7rem; grid-template-columns: 50px repeat(5, 1fr); } }
+@media (max-width: 768px) { .schedule-grid { font-size: 0.68rem; grid-template-columns: 55px repeat(5, 1fr); } }
 </style>
 {% endblock %}
 {% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <form method="get" class="d-flex gap-2 align-items-center">
+        <label class="form-label mb-0">学期</label>
+        <select name="semester_id" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+            <option value="">全部学期</option>
+            {% for s in semesters %}
+            <option value="{{ s.id }}" {% if selected_semester==s.id %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
 {% if schedule %}
 {% set days = ['周一','周二','周三','周四','周五'] %}
-{% set times = ['1-2节','3-4节','5-6节','7-8节'] %}
 {% set colors = ['#0d6efd','#198754','#dc3545','#fd7e14','#6f42c1','#0dcaf0','#d63384','#20c997'] %}
+{% set ns = namespace(periods=[]) %}
+{% for ts in time_slots %}
+    {% if ts.period_num not in ns.periods %}{% set _ = ns.periods.append(ts.period_num) %}{% endif %}
+{% endfor %}
 
 <div class="card"><div class="card-body">
 <div class="schedule-grid">
-    <div class="schedule-header">时间</div>
+    <div class="schedule-header">节次</div>
     {% for d in days %}<div class="schedule-header">{{ d }}</div>{% endfor %}
 
-    {% for t in times %}
-    <div class="schedule-time">{{ t }}</div>
-    {% for d_idx in range(5) %}
-    {% set found = namespace(course=None) %}
-    {% for s in schedule %}
-        {% if s.schedule and ('周' + ['一','二','三','四','五'][d_idx]) in s.schedule and t[:3] in s.schedule %}
-            {% set found.course = s %}
+    {% for p in ns.periods|sort %}
+    {% set sample = time_slots|selectattr('period_num','equalto',p)|first %}
+    <div class="schedule-time">
+        <span>{{ sample.label if sample else '第'+p|string+'节' }}</span>
+        {% if sample %}<span class="text-muted">{{ format_time(sample.start_time) }}</span>{% endif %}
+    </div>
+    {% for day_num in range(1, 6) %}
+    {% set found = namespace(items=[]) %}
+    {% for gs in grid_slots %}
+        {% if gs.day_of_week == day_num and gs.period_num == p %}
+            {% set _ = found.items.append(gs) %}
         {% endif %}
     {% endfor %}
-    <div class="schedule-cell {% if found.course %}course{% endif %}"
-         {% if found.course %}style="border-left-color:{{ colors[loop.index0%8] }}; background:{{ colors[loop.index0%8] }}11"
-         data-bs-toggle="tooltip" title="{{ found.course.course_name }}&#10;{{ found.course.teacher_name }}&#10;{{ found.course.classroom or '' }}"{% endif %}>
-        {% if found.course %}
-        <div class="course-name">{{ found.course.course_name }}</div>
-        <div class="course-info">{{ found.course.teacher_name }}</div>
-        <div class="course-info">{{ found.course.classroom or '' }} | {{ found.course.credit }}学分</div>
-        {% endif %}
+    <div class="schedule-cell {% if found.items %}course{% endif %}"
+         {% if found.items %}style="border-left-color:{{ colors[(day_num+p)%8] }}; background:{{ colors[(day_num+p)%8] }}11"{% endif %}>
+        {% for item in found.items %}
+        <div class="mb-1">
+            <div class="course-name">{{ item.course_name }}</div>
+            <div class="course-info">{{ item.teacher_name }}</div>
+            <div class="course-info">{{ item.classroom_name }}</div>
+        </div>
+        {% endfor %}
     </div>
     {% endfor %}
     {% endfor %}
@@ -49,16 +69,20 @@
 
 <div class="mt-3">
     <div class="card"><div class="card-body">
-        <h6>课程列表</h6>
+        <h6>已选课程列表</h6>
         <table class="table table-sm table-bordered">
-            <thead><tr><th>课程</th><th>代码</th><th>学分</th><th>教师</th><th>时间</th><th>教室</th><th>操作</th></tr></thead>
+            <thead><tr><th>课程</th><th>代码</th><th>学分</th><th>教师</th><th>时间地点</th><th>操作</th></tr></thead>
             <tbody>
                 {% for s in schedule %}
-                <tr><td>{{ s.course_name }}</td><td>{{ s.course_code }}</td><td>{{ s.credit }}</td>
-                    <td>{{ s.teacher_name }}</td><td>{{ s.schedule or '-' }}</td><td>{{ s.classroom or '-' }}</td>
-                    <td>
+                <tr>
+                    <td>{{ s.course_name }}</td><td>{{ s.course_code }}</td><td>{{ s.credit }}</td>
+                    <td>{{ s.teacher_name }}</td>
+                    <td class="small">{{ s.schedule or '-' }}</td>
+                    <td nowrap>
+                        <a href="{{ url_for('student.enrolled_course_detail', oid=s.offering_id) }}" class="btn btn-sm btn-outline-info">详情</a>
                         <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#dropModal{{ s.offering_id }}">退课</button>
-                    </td></tr>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -69,7 +93,10 @@
 <div class="modal fade" id="dropModal{{ s.offering_id }}" tabindex="-1">
     <div class="modal-dialog modal-sm"><div class="modal-content">
         <div class="modal-header"><h6>确认退课</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body"><p>确认退选 <strong>{{ s.course_name }}</strong>？</p></div>
+        <div class="modal-body">
+            <p>确认退选 <strong>{{ s.course_name }}</strong>？</p>
+            <p class="small text-muted mb-0">{{ s.schedule }}</p>
+        </div>
         <div class="modal-footer">
             <form method="post" action="{{ url_for('student.drop', oid=s.offering_id) }}">
                 {% include '_csrf_field.html' %}
@@ -87,10 +114,4 @@
     <a href="{{ url_for('student.courses') }}" class="btn btn-primary">去选课</a>
 </div>
 {% endif %}
-{% endblock %}
-{% block extra_js %}
-<script>
-var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-tooltipTriggerList.map(function(el){ return new bootstrap.Tooltip(el, {html:true}); });
-</script>
 {% endblock %}

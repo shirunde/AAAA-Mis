@@ -218,3 +218,31 @@ def profile():
         return redirect(url_for('auth.profile'))
 
     return render_template('auth/profile.html', profile=profile_data)
+
+
+@auth_bp.route('/notifications')
+@login_required
+def notifications():
+    data = query(
+        """SELECT * FROM notifications WHERE user_id=%s ORDER BY is_read ASC, created_at DESC LIMIT 50""",
+        (current_user['id'],)
+    )
+    return render_template('auth/notifications.html', notifications=data)
+
+
+@auth_bp.route('/notifications/<int:nid>/read', methods=['POST'])
+@login_required
+def notification_read(nid):
+    execute(
+        'UPDATE notifications SET is_read=1 WHERE id=%s AND user_id=%s',
+        (nid, current_user['id'])
+    )
+    return redirect(url_for('auth.notifications'))
+
+
+@auth_bp.route('/notifications/read-all', methods=['POST'])
+@login_required
+def notifications_read_all():
+    execute('UPDATE notifications SET is_read=1 WHERE user_id=%s', (current_user['id'],))
+    flash('已全部标为已读', 'success')
+    return redirect(url_for('auth.notifications'))

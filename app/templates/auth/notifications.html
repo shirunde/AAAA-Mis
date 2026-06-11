@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}消息通知{% endblock %}{% block page_title %}消息通知{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+    <span class="text-muted">共 {{ notifications|length }} 条消息</span>
+    {% if notifications|selectattr('is_read','equalto',0)|list|length > 0 %}
+    <form method="post" action="{{ url_for('auth.notifications_read_all') }}">
+        {% include '_csrf_field.html' %}
+        <button class="btn btn-sm btn-outline-secondary">全部标为已读</button>
+    </form>
+    {% endif %}
+</div>
+<div class="list-group">
+    {% for n in notifications %}
+    <div class="list-group-item {% if not n.is_read %}list-group-item-light border-start border-3 border-primary{% endif %}">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h6 class="mb-1">
+                    {% if n.ntype=='success' %}<i class="bi bi-check-circle text-success"></i>
+                    {% elif n.ntype=='warning' %}<i class="bi bi-exclamation-triangle text-warning"></i>
+                    {% elif n.ntype=='danger' %}<i class="bi bi-x-circle text-danger"></i>
+                    {% else %}<i class="bi bi-info-circle text-info"></i>{% endif %}
+                    {{ n.title }}
+                    {% if not n.is_read %}<span class="badge bg-primary">新</span>{% endif %}
+                </h6>
+                <p class="mb-1">{{ n.content }}</p>
+                <small class="text-muted">{{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}</small>
+            </div>
+            {% if not n.is_read %}
+            <form method="post" action="{{ url_for('auth.notification_read', nid=n.id) }}">
+                {% include '_csrf_field.html' %}
+                <button class="btn btn-sm btn-link">标为已读</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">暂无消息</div>
+    {% endfor %}
+</div>
+{% endblock %}

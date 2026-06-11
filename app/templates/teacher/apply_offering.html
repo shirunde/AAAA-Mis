@@ -88,7 +88,11 @@
                 <textarea name="apply_reason" class="form-control" rows="3"></textarea>
             </div>
 
-            <button type="submit" class="btn btn-primary">提交申请</button>
+            <div id="conflictAlert" class="alert alert-danger d-none mb-3"></div>
+            <div id="capacityAlert" class="alert alert-warning d-none mb-3"></div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">提交申请</button>
+            <button type="button" class="btn btn-outline-secondary" id="checkBtn">检测冲突</button>
             <a href="{{ url_for('teacher.my_offerings') }}" class="btn btn-secondary">取消</a>
         </form>
     </div></div>
@@ -113,6 +117,67 @@ pb.addEventListener('click', function() {
         + ' | 类型: ' + (typeMap[opt.dataset.type]||opt.dataset.type)
         + '<br>描述: ' + (opt.dataset.desc || '暂无');
     pv.style.display = '';
+});
+
+function runConflictCheck() {
+    var slots = Array.from(document.querySelectorAll('input[name="time_slots"]:checked')).map(function(el){ return parseInt(el.value); });
+    var classroomId = document.querySelector('select[name="classroom_id"]').value;
+    var semesterId = document.querySelector('select[name="semester_id"]').value;
+    var maxStudents = document.querySelector('input[name="max_students"]').value;
+    var alertBox = document.getElementById('conflictAlert');
+    var capBox = document.getElementById('capacityAlert');
+    alertBox.classList.add('d-none');
+    capBox.classList.add('d-none');
+    if (!slots.length || !classroomId) return Promise.resolve(false);
+
+    return fetch('{{ url_for("teacher.check_conflicts_api") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value},
+        body: JSON.stringify({time_slot_ids: slots, classroom_id: parseInt(classroomId), semester_id: parseInt(semesterId), max_students: parseInt(maxStudents)})
+    }).then(function(r){ return r.json(); }).then(function(data) {
+        if (data.conflicts && data.conflicts.length) {
+            alertBox.innerHTML = '<strong>排课冲突：</strong><ul class="mb-0"><li>' + data.conflicts.join('</li><li>') + '</li></ul>';
+            alertBox.classList.remove('d-none');
+        }
+        if (data.capacity_warning) {
+            capBox.textContent = data.capacity_warning;
+            capBox.classList.remove('d-none');
+        }
+        return data.ok;
+    });
+}
+
+document.getElementById('checkBtn').addEventListener('click', runConflictCheck);
+
+document.querySelector('form').addEventListener('submit', function(e) {
+    var form = this;
+    var slots = document.querySelectorAll('input[name="time_slots"]:checked');
+    var classroomId = document.querySelector('select[name="classroom_id"]').value;
+    if (!slots.length || !classroomId) {
+        return;
+    }
+    e.preventDefault();
+    runConflictCheck().then(function(ok) {
+        if (ok) {
+            HTMLFormElement.prototype.submit.call(form);
+            return;
+        }
+        if (!document.getElementById('conflictAlert').classList.contains('d-none')) {
+            if (confirm('存在排课冲突，仍要提交申请吗？（审核时可能被驳回）')) {
+                HTMLFormElement.prototype.submit.call(form);
+            }
+            return;
+        }
+        if (!document.getElementById('capacityAlert').classList.contains('d-none')) {
+            if (confirm('教室容量不足，仍要提交吗？')) {
+                HTMLFormElement.prototype.submit.call(form);
+            }
+            return;
+        }
+        HTMLFormElement.prototype.submit.call(form);
+    }).catch(function() {
+        HTMLFormElement.prototype.submit.call(form);
+    });
 });
 </script>
 {% endblock %}

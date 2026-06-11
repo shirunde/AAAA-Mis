@@ -52,14 +52,23 @@
         <nav class="navbar navbar-light bg-white shadow-sm px-3">
             <button class="btn btn-sm btn-outline-secondary" id="sidebarToggle"><i class="bi bi-list"></i></button>
             <span class="ms-2 fw-bold">{% block page_title %}教务管理系统{% endblock %}</span>
-            <div class="ms-auto dropdown">
+            <div class="ms-auto d-flex align-items-center gap-2">
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('auth.notifications') }}" class="btn btn-sm btn-outline-secondary position-relative" title="消息通知">
+                    <i class="bi bi-bell"></i>
+                    {% if unread_notify_count %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ unread_notify_count }}</span>{% endif %}
+                </a>
+                {% endif %}
+            <div class="dropdown">
                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                     <i class="bi bi-person-circle"></i> {{ current_user.get('username') if current_user.is_authenticated else '未登录' }}</a>
                 <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{{ url_for('auth.notifications') }}"><i class="bi bi-bell me-2"></i>消息通知{% if unread_notify_count %} <span class="badge bg-danger">{{ unread_notify_count }}</span>{% endif %}</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="bi bi-gear me-2"></i>个人信息</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>退出登录</a></li>
                 </ul>
+            </div>
             </div>
         </nav>
         <main class="p-4">

@@ -6,7 +6,7 @@ from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from app.decorators import role_required
 from app.db import query, execute, insert, paginate, call_proc, get_conn, call_proc_rows
-from app.helpers import log_action
+from app.helpers import log_action, get_offering_schedule, notify_teacher, notify_user
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -392,7 +392,7 @@ def offerings():
 
     where = ''
     args = []
-    if status_filter in ('pending', 'approved', 'rejected', 'published'):
+    if status_filter in ('pending', 'approved', 'rejected', 'published', 'cancelled'):
         where += ' AND co.status=%s'
         args.append(status_filter)
     if search:
@@ -408,22 +408,49 @@ def offerings():
              WHERE 1=1{where}
              ORDER BY co.status ASC, co.created_at DESC"""
     data = paginate(sql, tuple(args), page=page)
+    for o in data.get('items', []):
+        o['schedule_display'] = get_offering_schedule(o['id'])
+        o['enrolled_count'] = query(
+            "SELECT COUNT(*) AS c FROM enrollments WHERE course_offering_id=%s AND status='enrolled'",
+            (o['id'],), one=True
+        )['c']
     return render_template('admin/offerings.html', **data, status_filter=status_filter, search=search)
 
 
 @admin_bp.route('/offerings/<int:oid>/review', methods=['POST'])
 def offerings_review(oid):
     action = request.form['action']
-    comment = request.form.get('comment', '')
+    comment = request.form.get('comment', '').strip()
     if action not in ('approved', 'rejected'):
         flash('无效的审核操作', 'danger')
         return redirect(url_for('admin.offerings'))
+    if action == 'rejected' and not comment:
+        flash('驳回时必须填写审核意见', 'danger')
+        return redirect(url_for('admin.offerings'))
+
+    offering = query(
+        """SELECT co.*, c.name AS course_name, t.id AS teacher_id
+           FROM course_offerings co JOIN courses c ON co.course_id=c.id
+           JOIN teachers t ON co.teacher_id=t.id WHERE co.id=%s""",
+        (oid,), one=True
+    )
 
     try:
         out = call_proc('sp_approve_course_offering',
                         (oid, current_user['id'], action, comment, 0, ''), [4, 5])
         if out['p4'] == 0:
-            flash(f'开课申请已{("通过" if action == "approved" else "驳回")}', 'success')
+            label = '通过' if action == 'approved' else '驳回'
+            flash(f'开课申请已{label}', 'success')
+            if offering:
+                notify_teacher(
+                    offering['teacher_id'],
+                    f'开课申请已{label}',
+                    f'您的「{offering["course_name"]}」开课申请已{label}。'
+                    + (f'审核意见：{comment}' if comment else ''),
+                    'success' if action == 'approved' else 'warning',
+                    'offering', oid
+                )
+            log_action('offering_review', 'offering', oid, f'{label}: {comment}')
         else:
             flash(out['p5'], 'warning')
     except Exception as e:
@@ -433,9 +460,99 @@ def offerings_review(oid):
 
 @admin_bp.route('/offerings/<int:oid>/publish', methods=['POST'])
 def offerings_publish(oid):
-    execute("UPDATE course_offerings SET status='published' WHERE id=%s AND status='approved'", (oid,))
-    flash('课程已发布', 'success')
-    log_action('offering_publish', 'offering', oid, f'发布开课ID={oid}')
+    offering = query(
+        """SELECT co.*, c.name AS course_name, t.id AS teacher_id
+           FROM course_offerings co JOIN courses c ON co.course_id=c.id
+           JOIN teachers t ON co.teacher_id=t.id WHERE co.id=%s""",
+        (oid,), one=True
+    )
+    try:
+        out = call_proc('sp_publish_course_offering', (oid, current_user['id'], 0, ''), [2, 3])
+        if out['p2'] == 0:
+            flash(out['p3'], 'success')
+            if offering:
+                notify_teacher(
+                    offering['teacher_id'], '课程已发布',
+                    f'您的「{offering["course_name"]}」已通过审核并发布，学生现可选课。',
+                    'success', 'offering', oid
+                )
+            log_action('offering_publish', 'offering', oid, f'发布开课ID={oid}')
+        else:
+            flash(out['p3'], 'warning')
+    except Exception as e:
+        flash(f'发布失败：{str(e)}', 'danger')
+    return redirect(url_for('admin.offerings'))
+
+
+@admin_bp.route('/offerings/<int:oid>/unpublish', methods=['POST'])
+def offerings_unpublish(oid):
+    reason = request.form.get('reason', '').strip()
+    offering = query(
+        """SELECT co.*, c.name AS course_name, t.id AS teacher_id
+           FROM course_offerings co JOIN courses c ON co.course_id=c.id
+           JOIN teachers t ON co.teacher_id=t.id WHERE co.id=%s""",
+        (oid,), one=True
+    )
+    try:
+        out = call_proc('sp_unpublish_course_offering',
+                        (oid, current_user['id'], reason, 0, ''), [3, 4])
+        if out['p3'] == 0:
+            flash(out['p4'], 'success')
+            if offering:
+                notify_teacher(
+                    offering['teacher_id'], '课程发布已撤销',
+                    f'「{offering["course_name"]}」已撤销发布。' + (f'原因：{reason}' if reason else ''),
+                    'warning', 'offering', oid
+                )
+            log_action('offering_unpublish', 'offering', oid, reason or '撤销发布')
+        else:
+            flash(out['p4'], 'warning')
+    except Exception as e:
+        flash(f'撤销发布失败：{str(e)}', 'danger')
+    return redirect(url_for('admin.offerings'))
+
+
+@admin_bp.route('/offerings/<int:oid>/cancel', methods=['POST'])
+def offerings_cancel(oid):
+    reason = request.form.get('reason', '').strip()
+    if not reason:
+        flash('停开课程必须填写原因', 'danger')
+        return redirect(url_for('admin.offerings'))
+
+    offering = query(
+        """SELECT co.*, c.name AS course_name, t.id AS teacher_id
+           FROM course_offerings co JOIN courses c ON co.course_id=c.id
+           JOIN teachers t ON co.teacher_id=t.id WHERE co.id=%s""",
+        (oid,), one=True
+    )
+    try:
+        out = call_proc('sp_cancel_course_offering',
+                        (oid, current_user['id'], reason, 0, ''), [3, 4])
+        if out['p3'] == 0:
+            flash(out['p4'], 'success')
+            if offering:
+                notify_teacher(
+                    offering['teacher_id'], '课程已停开',
+                    f'「{offering["course_name"]}」已停开。原因：{reason}',
+                    'danger', 'offering', oid
+                )
+                students = query(
+                    """SELECT s.user_id FROM enrollments e
+                       JOIN students s ON e.student_id=s.id
+                       WHERE e.course_offering_id=%s AND e.status='dropped'""",
+                    (oid,)
+                )
+                for s in students:
+                    notify_user(
+                        s['user_id'], '课程停开通知',
+                        f'您选修的「{offering["course_name"]}」已停开，系统已自动退课。原因：{reason}',
+                        'warning', 'offering', oid
+                    )
+            log_action('offering_cancel', 'offering', oid, reason)
+        else:
+            flash(out['p4'], 'warning')
+    except Exception as e:
+        flash(f'停开失败：{str(e)}', 'danger')
     return redirect(url_for('admin.offerings'))
 
 

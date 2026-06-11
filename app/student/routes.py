@@ -4,7 +4,11 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.decorators import role_required
 from app.db import query, execute, paginate, call_proc, call_proc_rows
-from app.helpers import parse_schedule_slots, get_active_selection_periods
+from app.helpers import (
+    get_active_selection_periods, get_upcoming_selection_periods,
+    get_offering_schedule, get_offering_schedule_rows, get_offering_classrooms,
+    get_student_schedule_grid, notify_user, format_time,
+)
 
 student_bp = Blueprint('student', __name__)
 
@@ -126,9 +130,10 @@ def courses():
                 if offering_slot_set & enrolled_slot_set:
                     conflict_offering_ids.add(o['id'])
 
+    upcoming_periods = get_upcoming_selection_periods()
     return render_template('student/courses.html', **data, search=search, type=course_type,
                            enrolled_ids=enrolled_ids, conflict_offering_ids=conflict_offering_ids,
-                           selection_periods=selection_periods)
+                           selection_periods=selection_periods, upcoming_periods=upcoming_periods)
 
 
 @student_bp.route('/course/<int:oid>/detail')
@@ -144,11 +149,23 @@ def course_detail(oid):
         WHERE co.id=%s AND co.status='published'""", (oid,), one=True)
     if not detail:
         return jsonify({'error': 'not found'}), 404
-    
-    # Get schedule from offering_schedules table
-    schedule_info = get_offering_schedule(oid)
-    detail['schedule'] = schedule_info if schedule_info != '未安排' else None
-    
+
+    schedule_rows = get_offering_schedule_rows(oid)
+    detail['schedule'] = get_offering_schedule(oid)
+    detail['classroom'] = get_offering_classrooms(oid)
+    detail['schedule_slots'] = [
+        {
+            'day': ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][r['day_of_week']],
+            'label': r['label'],
+            'time': f"{format_time(r['start_time'])}-{format_time(r['end_time'])}",
+            'classroom': r['classroom_name'],
+        }
+        for r in schedule_rows
+    ]
+    detail['course_type_label'] = {
+        'required': '必修', 'elective': '选修', 'optional': '任选'
+    }.get(detail['course_type'], detail['course_type'])
+    detail['remaining'] = max(0, detail['max_students'] - detail['enrolled_count'])
     return jsonify(detail)
 
 
@@ -161,6 +178,17 @@ def enroll(oid):
         result_msg = out['p3']
         msgs = {0: 'success', 1: 'warning', 2: 'danger', 3: 'warning', 4: 'warning', 5: 'danger'}
         flash(result_msg, msgs.get(result_code, 'danger'))
+        if result_code == 0:
+            course = query(
+                """SELECT c.name FROM course_offerings co JOIN courses c ON co.course_id=c.id WHERE co.id=%s""",
+                (oid,), one=True
+            )
+            if course:
+                notify_user(
+                    current_user['id'], '选课成功',
+                    f'您已成功选修「{course["name"]}」，可在「我的课表」查看上课安排。',
+                    'success', 'offering', oid
+                )
     except Exception as e:
         flash(f'选课失败：{str(e)}', 'danger')
     return redirect(url_for('student.courses'))
@@ -183,10 +211,46 @@ def drop(oid):
 @student_bp.route('/schedule')
 def schedule():
     sid = get_student_id()
-    data = query("""SELECT offering_id, course_name, course_code, credit, teacher_name,
-        schedule, classroom, semester_name, enrolled_at
-        FROM v_student_schedule WHERE student_id=%s ORDER BY schedule""", (sid,))
-    return render_template('student/schedule.html', schedule=data)
+    semester_id = request.args.get('semester_id', type=int)
+    if not semester_id:
+        current = query('SELECT id FROM semesters WHERE is_current=1 LIMIT 1', one=True)
+        semester_id = current['id'] if current else None
+
+    grid_data = get_student_schedule_grid(sid, semester_id)
+    semesters = query('SELECT * FROM semesters ORDER BY id DESC')
+    return render_template(
+        'student/schedule.html',
+        schedule=grid_data['courses'],
+        grid_slots=grid_data['grid_slots'],
+        time_slots=grid_data['time_slots'],
+        semesters=semesters,
+        selected_semester=semester_id,
+    )
+
+
+@student_bp.route('/course/<int:oid>/enrolled-detail')
+def enrolled_course_detail(oid):
+    """已选课程详情页"""
+    sid = get_student_id()
+    detail = query("""SELECT co.*, c.name AS course_name, c.code AS course_code, c.credit, c.hours,
+        c.course_type, c.description, t.name AS teacher_name, t.title, sem.name AS semester_name,
+        e.enrolled_at,
+        (SELECT COUNT(*) FROM enrollments e2 WHERE e2.course_offering_id=co.id AND e2.status='enrolled') AS enrolled_count
+        FROM enrollments e
+        JOIN course_offerings co ON e.course_offering_id=co.id
+        JOIN courses c ON co.course_id=c.id
+        JOIN teachers t ON co.teacher_id=t.id
+        JOIN semesters sem ON co.semester_id=sem.id
+        WHERE e.student_id=%s AND e.course_offering_id=%s AND e.status='enrolled'""",
+        (sid, oid), one=True)
+    if not detail:
+        flash('未找到该选课记录', 'warning')
+        return redirect(url_for('student.schedule'))
+
+    detail['schedule_display'] = get_offering_schedule(oid)
+    detail['classroom'] = get_offering_classrooms(oid)
+    detail['schedule_rows'] = get_offering_schedule_rows(oid)
+    return render_template('student/course_detail.html', course=detail)
 
 
 @student_bp.route('/grades')

@@ -3,16 +3,25 @@
 {% block content %}
 <h4 class="mb-3"><i class="bi bi-journals"></i> 我的开课列表</h4>
 <table class="table table-bordered table-hover">
-    <thead class="table-dark"><tr><th>ID</th><th>课程</th><th>学期</th><th>人数</th><th>教室</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
+    <thead class="table-dark"><tr><th>ID</th><th>课程</th><th>学期</th><th>人数</th><th>时间地点</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>
         {% for o in offerings %}
         <tr>
-            <td>{{ o.id }}</td><td>{{ o.course_name }} ({{ o.course_code }})</td><td>{{ o.semester_name }}</td>
-            <td>{{ o.enrolled_count }}/{{ o.max_students }}</td><td>{{ o.classroom or '-' }}</td><td>{{ o.schedule or '-' }}</td>
-            <td>{% if o.status=='pending' %}<span class="badge bg-warning">待审核</span>
+            <td>{{ o.id }}</td>
+            <td>{{ o.course_name }} ({{ o.course_code }})</td>
+            <td>{{ o.semester_name }}</td>
+            <td>{{ o.enrolled_count }}/{{ o.max_students }}</td>
+            <td class="small">{{ o.schedule_display or '未安排' }}</td>
+            <td>
+                {% if o.status=='pending' %}<span class="badge bg-warning">待审核</span>
                 {% elif o.status=='approved' %}<span class="badge bg-info">已通过</span>
                 {% elif o.status=='published' %}<span class="badge bg-success">已发布</span>
-                {% else %}<span class="badge bg-danger">已驳回</span>{% endif %}</td>
+                {% elif o.status=='cancelled' %}<span class="badge bg-secondary">已停开</span>
+                {% else %}<span class="badge bg-danger">已驳回</span>{% endif %}
+                {% if o.review_comment %}
+                <br><small class="text-muted" title="{{ o.review_comment }}">{{ o.review_comment[:40] }}{% if o.review_comment|length>40 %}...{% endif %}</small>
+                {% endif %}
+            </td>
             <td nowrap>
                 {% if o.status=='pending' %}
                 <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editOfferingModal{{ o.id }}">编辑</button>
@@ -21,7 +30,9 @@
                     <button class="btn btn-sm btn-outline-danger">撤销</button>
                 </form>
                 {% endif %}
+                {% if o.status in ('approved','published') %}
                 <a href="{{ url_for('teacher.offering_students', oid=o.id) }}" class="btn btn-sm btn-outline-primary">学生名单</a>
+                {% endif %}
             </td>
         </tr>
         {% endfor %}
@@ -30,27 +41,60 @@
 
 {% for o in offerings %}
 {% if o.status=='pending' %}
-<!-- 编辑开课 Modal -->
 <div class="modal fade" id="editOfferingModal{{ o.id }}" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
         <form method="post" action="{{ url_for('teacher.edit_offering', oid=o.id) }}">
             {% include '_csrf_field.html' %}
             <div class="modal-header"><h5>编辑开课申请</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div class="mb-3"><label class="form-label">课程</label>
-                    <select name="course_id" class="form-select">
-                        {% for c in courses %}<option value="{{ c.id }}" {% if c.id==o.course_id %}selected{% endif %}>{{ c.name }} ({{ c.code }})</option>{% endfor %}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">课程</label>
+                        <select name="course_id" class="form-select">
+                            {% for c in courses %}<option value="{{ c.id }}" {% if c.id==o.course_id %}selected{% endif %}>{{ c.name }} ({{ c.code }})</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">学期</label>
+                        <select name="semester_id" class="form-select">
+                            {% for s in semesters %}<option value="{{ s.id }}" {% if s.id==o.semester_id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">人数上限</label>
+                    <input type="number" name="max_students" class="form-control" value="{{ o.max_students }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">上课教室</label>
+                    <select name="classroom_id" class="form-select" required>
+                        {% for c in classrooms %}
+                        <option value="{{ c.id }}" {% if c.id==o.classroom_id %}selected{% endif %}>{{ c.name }} (容量:{{ c.capacity or '?' }})</option>
+                        {% endfor %}
                     </select>
                 </div>
-                <div class="mb-3"><label class="form-label">学期</label>
-                    <select name="semester_id" class="form-select">
-                        {% for s in semesters %}<option value="{{ s.id }}" {% if s.id==o.semester_id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
-                    </select>
+                <div class="mb-3">
+                    <label class="form-label">上课时间</label>
+                    <div class="border rounded p-2" style="max-height:200px;overflow-y:auto;">
+                        {% set ns = namespace(current_day=None) %}
+                        {% for ts in time_slots %}
+                            {% if ts.day_of_week != ns.current_day %}
+                                {% if not loop.first %}<hr class="my-1">{% endif %}
+                                <strong class="text-primary">{{ ['','周一','周二','周三','周四','周五','周六','周日'][ts.day_of_week] }}</strong><br>
+                                {% set ns.current_day = ts.day_of_week %}
+                            {% endif %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="time_slots" value="{{ ts.id }}"
+                                       id="edit_slot_{{ o.id }}_{{ ts.id }}" {% if ts.id in o.selected_slots %}checked{% endif %}>
+                                <label class="form-check-label" for="edit_slot_{{ o.id }}_{{ ts.id }}">{{ ts.label }}</label>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
-                <div class="mb-3"><label class="form-label">人数上限</label><input type="number" name="max_students" class="form-control" value="{{ o.max_students }}" required></div>
-                <div class="mb-3"><label class="form-label">教室</label><input type="text" name="classroom" class="form-control" value="{{ o.classroom or '' }}"></div>
-                <div class="mb-3"><label class="form-label">上课时间</label><input type="text" name="schedule" class="form-control" value="{{ o.schedule or '' }}"></div>
-                <div class="mb-3"><label class="form-label">申请理由</label><textarea name="apply_reason" class="form-control" rows="2">{{ o.apply_reason or '' }}</textarea></div>
+                <div class="mb-3">
+                    <label class="form-label">申请理由</label>
+                    <textarea name="apply_reason" class="form-control" rows="2">{{ o.apply_reason or '' }}</textarea>
+                </div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">保存</button></div>
         </form>

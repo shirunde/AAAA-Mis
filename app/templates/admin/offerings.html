@@ -10,6 +10,7 @@
             <option value="approved" {% if status_filter=='approved' %}selected{% endif %}>已通过</option>
             <option value="rejected" {% if status_filter=='rejected' %}selected{% endif %}>已驳回</option>
             <option value="published" {% if status_filter=='published' %}selected{% endif %}>已发布</option>
+            <option value="cancelled" {% if status_filter=='cancelled' %}selected{% endif %}>已停开</option>
         </select>
     </div>
     <div class="col-md-4"><input type="text" name="search" class="form-control" placeholder="搜索课程名/代码/教师" value="{{ search or '' }}"></div>
@@ -17,26 +18,40 @@
 </form>
 <div class="table-responsive">
 <table class="table table-bordered table-hover">
-    <thead class="table-dark"><tr><th>ID</th><th>课程</th><th>教师</th><th>学期</th><th>上限</th><th>教室</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
+    <thead class="table-dark"><tr><th>ID</th><th>课程</th><th>教师</th><th>学期</th><th>人数</th><th>时间地点</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>
         {% for o in items %}
-        <tr class="{% if o.status=='pending' %}table-warning{% elif o.status=='approved' %}table-info{% elif o.status=='published' %}table-success{% else %}table-danger{% endif %}">
-            <td>{{ o.id }}</td><td>{{ o.course_name }} <small>({{ o.course_code }})</small></td>
-            <td>{{ o.teacher_name }}</td><td>{{ o.semester_name }}</td><td>{{ o.max_students }}</td>
-            <td>{{ o.classroom or '-' }}</td><td>{{ o.schedule or '-' }}</td>
-            <td>{% if o.status=='pending' %}<span class="badge bg-warning">待审核</span>
+        <tr class="{% if o.status=='pending' %}table-warning{% elif o.status=='approved' %}table-info{% elif o.status=='published' %}table-success{% elif o.status=='cancelled' %}table-secondary{% else %}table-danger{% endif %}">
+            <td>{{ o.id }}</td>
+            <td>{{ o.course_name }} <small>({{ o.course_code }})</small>
+                {% if o.apply_reason %}<br><small class="text-muted">申请理由：{{ o.apply_reason[:40] }}{% if o.apply_reason|length>40 %}...{% endif %}</small>{% endif %}
+            </td>
+            <td>{{ o.teacher_name }}</td><td>{{ o.semester_name }}</td>
+            <td>{{ o.enrolled_count }}/{{ o.max_students }}</td>
+            <td class="small">{{ o.schedule_display or '未安排' }}</td>
+            <td>
+                {% if o.status=='pending' %}<span class="badge bg-warning">待审核</span>
                 {% elif o.status=='approved' %}<span class="badge bg-info">已通过</span>
                 {% elif o.status=='published' %}<span class="badge bg-success">已发布</span>
-                {% else %}<span class="badge bg-danger">已驳回</span>{% endif %}</td>
+                {% elif o.status=='cancelled' %}<span class="badge bg-secondary">已停开</span>
+                {% else %}<span class="badge bg-danger">已驳回</span>{% endif %}
+                {% if o.review_comment and o.status in ('rejected','approved','published','cancelled') %}
+                <br><small class="text-muted" title="{{ o.review_comment }}">意见：{{ o.review_comment[:30] }}{% if o.review_comment|length>30 %}...{% endif %}</small>
+                {% endif %}
+            </td>
             <td nowrap>
                 {% if o.status=='pending' %}
                 <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#reviewModal{{ o.id }}_a">通过</button>
                 <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#reviewModal{{ o.id }}_r">驳回</button>
                 {% elif o.status=='approved' %}
-                <form method="post" action="{{ url_for('admin.offerings_publish', oid=o.id) }}" style="display:inline">
+                <form method="post" action="{{ url_for('admin.offerings_publish', oid=o.id) }}" style="display:inline" onsubmit="return confirm('确认发布该课程供学生选课？')">
                     {% include '_csrf_field.html' %}
                     <button class="btn btn-sm btn-primary">发布</button>
                 </form>
+                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ o.id }}">停开</button>
+                {% elif o.status=='published' %}
+                <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#unpublishModal{{ o.id }}">撤销发布</button>
+                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ o.id }}">停开</button>
                 {% endif %}
             </td>
         </tr>
@@ -53,8 +68,11 @@
             {% include '_csrf_field.html' %}
             <input type="hidden" name="action" value="approved">
             <div class="modal-header"><h5>通过开课申请</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body"><p>{{ o.course_name }} - {{ o.teacher_name }}</p>
-                <div class="mb-3"><label class="form-label">审核意见</label><textarea name="comment" class="form-control" rows="2"></textarea></div></div>
+            <div class="modal-body">
+                <p><strong>{{ o.course_name }}</strong> - {{ o.teacher_name }}</p>
+                <p class="small text-muted">{{ o.schedule_display }}</p>
+                <div class="mb-3"><label class="form-label">审核意见（选填）</label><textarea name="comment" class="form-control" rows="2"></textarea></div>
+            </div>
             <div class="modal-footer"><button type="submit" class="btn btn-success">确认通过</button></div>
         </form>
     </div></div>
@@ -65,9 +83,56 @@
             {% include '_csrf_field.html' %}
             <input type="hidden" name="action" value="rejected">
             <div class="modal-header"><h5>驳回开课申请</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body"><p>{{ o.course_name }} - {{ o.teacher_name }}</p>
-                <div class="mb-3"><label class="form-label">驳回原因</label><textarea name="comment" class="form-control" rows="2" required></textarea></div></div>
+            <div class="modal-body">
+                <p><strong>{{ o.course_name }}</strong> - {{ o.teacher_name }}</p>
+                <p class="small text-muted">{{ o.schedule_display }}</p>
+                <div class="mb-3"><label class="form-label">驳回原因 <span class="text-danger">*</span></label><textarea name="comment" class="form-control" rows="2" required placeholder="请说明驳回原因，教师将收到通知"></textarea></div>
+            </div>
             <div class="modal-footer"><button type="submit" class="btn btn-danger">确认驳回</button></div>
+        </form>
+    </div></div>
+</div>
+{% endfor %}
+
+{% for o in items if o.status=='published' %}
+<div class="modal fade" id="unpublishModal{{ o.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.offerings_unpublish', oid=o.id) }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>撤销发布</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p>将 <strong>{{ o.course_name }}</strong> 从「已发布」恢复为「已通过」。</p>
+                {% if o.enrolled_count > 0 %}
+                <div class="alert alert-warning">已有 {{ o.enrolled_count }} 名学生选课，无法撤销发布，请使用「停开课程」。</div>
+                {% else %}
+                <p class="small text-muted">撤销后学生将无法看到该课程，教师会收到通知。</p>
+                <div class="mb-3"><label class="form-label">撤销原因</label><textarea name="reason" class="form-control" rows="2"></textarea></div>
+                {% endif %}
+            </div>
+            {% if o.enrolled_count == 0 %}
+            <div class="modal-footer"><button type="submit" class="btn btn-warning">确认撤销发布</button></div>
+            {% endif %}
+        </form>
+    </div></div>
+</div>
+{% endfor %}
+
+{% for o in items if o.status in ('approved','published') %}
+<div class="modal fade" id="cancelModal{{ o.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" action="{{ url_for('admin.offerings_cancel', oid=o.id) }}">
+            {% include '_csrf_field.html' %}
+            <div class="modal-header"><h5>停开课程</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p>确认停开 <strong>{{ o.course_name }}</strong>？</p>
+                {% if o.enrolled_count > 0 %}
+                <div class="alert alert-danger">将自动退选 {{ o.enrolled_count }} 名学生，并通知相关师生。</div>
+                {% endif %}
+                <div class="mb-3"><label class="form-label">停开原因 <span class="text-danger">*</span></label>
+                    <textarea name="reason" class="form-control" rows="2" required placeholder="如：选课人数不足、教师变动等"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-danger">确认停开</button></div>
         </form>
     </div></div>
 </div>

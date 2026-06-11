@@ -23,6 +23,8 @@ mysql -u root -p < sql/01_schema.sql
 mysql -u root -p < sql/03_procedures.sql
 mysql -u root -p < sql/04_views.sql
 mysql -u root -p < sql/05_academic_alerts.sql
+mysql -u root -p < sql/06_schedule_migration.sql
+mysql -u root -p < sql/07_workflow_improvements.sql
 mysql -u root -p < sql/02_seed.sql
 ```
 

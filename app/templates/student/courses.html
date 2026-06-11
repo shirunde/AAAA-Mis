@@ -13,11 +13,20 @@
 
 {% if selection_periods %}
 <div class="alert alert-info mb-3">
-    <i class="bi bi-clock me-1"></i><strong>当前选课时间：</strong>
+    <i class="bi bi-clock me-1"></i><strong>当前开放：</strong>
     {% for sp in selection_periods %}
     <span class="me-3">{{ '选课' if sp.period_type == 'selection' else '退课' }}：{{ sp.start_time.strftime('%m-%d %H:%M') }} ~ {{ sp.end_time.strftime('%m-%d %H:%M') }}</span>
     {% endfor %}
 </div>
+{% elif upcoming_periods %}
+<div class="alert alert-secondary mb-3">
+    <i class="bi bi-clock-history me-1"></i><strong>选课尚未开始：</strong>
+    {% for sp in upcoming_periods %}
+    <span class="me-3">{{ '选课' if sp.period_type == 'selection' else '退课' }}将于 {{ sp.start_time.strftime('%m-%d %H:%M') }} 开放</span>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-warning mb-3"><i class="bi bi-exclamation-circle me-1"></i>当前不在选课/退课时间窗口内</div>
 {% endif %}
 
 <div class="row g-3">
@@ -85,15 +94,24 @@ document.querySelectorAll('.detail-btn').forEach(function(btn) {
             .then(r => r.json())
             .then(d => {
                 document.getElementById('detailTitle').textContent = d.course_name + ' (' + d.course_code + ')';
+                var slotsHtml = '';
+                if (d.schedule_slots && d.schedule_slots.length) {
+                    slotsHtml = '<table class="table table-sm mb-0"><thead><tr><th>星期</th><th>节次</th><th>时间</th><th>教室</th></tr></thead><tbody>'
+                        + d.schedule_slots.map(function(s){
+                            return '<tr><td>'+s.day+'</td><td>'+s.label+'</td><td>'+s.time+'</td><td>'+s.classroom+'</td></tr>';
+                        }).join('') + '</tbody></table>';
+                } else {
+                    slotsHtml = d.schedule || '待定';
+                }
                 document.getElementById('detailBody').innerHTML = `
                     <table class="table table-bordered"><tbody>
                         <tr><td width="20%">课程名称</td><td>${d.course_name} (${d.course_code})</td></tr>
                         <tr><td>学分/学时</td><td>${d.credit} / ${d.hours}</td></tr>
-                        <tr><td>课程类型</td><td>${d.course_type==='required'?'必修':d.course_type==='elective'?'选修':'任选'}</td></tr>
+                        <tr><td>课程类型</td><td>${d.course_type_label||d.course_type}</td></tr>
                         <tr><td>授课教师</td><td>${d.teacher_name} ${d.title?'('+d.title+')':''}</td></tr>
-                        <tr><td>上课时间</td><td>${d.schedule||'待定'}</td></tr>
-                        <tr><td>上课教室</td><td>${d.classroom||'待定'}</td></tr>
-                        <tr><td>选课人数</td><td>${d.enrolled_count}/${d.max_students}</td></tr>
+                        <tr><td>上课安排</td><td>${slotsHtml}</td></tr>
+                        <tr><td>选课人数</td><td>${d.enrolled_count}/${d.max_students}（剩余 ${d.remaining} 名额）</td></tr>
+                        <tr><td>学期</td><td>${d.semester_name}</td></tr>
                         <tr><td>课程描述</td><td>${d.description||'暂无描述'}</td></tr>
                     </tbody></table>`;
                 new bootstrap.Modal(document.getElementById('detailModal')).show();

@@ -69,6 +69,17 @@ def create_app():
     def get_offering_schedule(offering_id):
         return helpers.get_offering_schedule(offering_id)
 
+    @app.template_global()
+    def format_time(value):
+        return helpers.format_time(value)
+
+    @app.context_processor
+    def inject_notifications():
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            return {'unread_notify_count': helpers.get_unread_notification_count(current_user['id'])}
+        return {'unread_notify_count': 0}
+
     # Home route
     @app.route('/')
     def index():

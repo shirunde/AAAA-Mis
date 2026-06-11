@@ -3,7 +3,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.decorators import role_required
 from app.db import query, execute, insert, get_conn
-from app.helpers import log_action
+from app.helpers import (
+    log_action, check_offering_conflicts, check_classroom_capacity,
+    save_offering_schedules, get_offering_schedule,
+)
 
 teacher_bp = Blueprint('teacher', __name__)
 
@@ -65,51 +68,90 @@ def dashboard():
     return render_template('teacher/dashboard.html', offerings=my_offerings)
 
 
+def _offering_form_context():
+    return {
+        'courses': query('SELECT * FROM courses ORDER BY id'),
+        'semesters': query('SELECT * FROM semesters ORDER BY id DESC'),
+        'time_slots': query('SELECT * FROM time_slots ORDER BY day_of_week, period_num'),
+        'classrooms': query('SELECT * FROM classrooms WHERE is_active=1 ORDER BY code'),
+    }
+
+
 @teacher_bp.route('/apply-offering', methods=['GET', 'POST'])
 def apply_offering():
     tid = get_teacher_id()
     if request.method == 'POST':
-        # 获取时间段和教室列表
         time_slot_ids = request.form.getlist('time_slots', type=int)
         classroom_id = request.form.get('classroom_id', type=int)
+        semester_id = request.form.get('semester_id', type=int)
+        max_students = request.form.get('max_students', type=int)
 
         if not time_slot_ids or not classroom_id:
             flash('请选择上课时间和教室', 'danger')
-            courses = query('SELECT * FROM courses ORDER BY id')
-            semesters = query('SELECT * FROM semesters ORDER BY id DESC')
-            time_slots = query('SELECT * FROM time_slots ORDER BY day_of_week, period_num')
-            classrooms = query('SELECT * FROM classrooms WHERE is_active=1 ORDER BY code')
-            return render_template('teacher/apply_offering.html',
-                                 courses=courses, semesters=semesters,
-                                 time_slots=time_slots, classrooms=classrooms)
+            return render_template('teacher/apply_offering.html', **_offering_form_context())
 
-        # 插入开课记录
-        offering_id = insert(
-            """INSERT INTO course_offerings (course_id, teacher_id, semester_id, max_students, apply_reason)
-               VALUES (%s,%s,%s,%s,%s)""",
-            (request.form['course_id'], tid, request.form['semester_id'],
-             request.form['max_students'], request.form.get('apply_reason', ''))
+        ok, cap_msg = check_classroom_capacity(classroom_id, max_students)
+        if not ok:
+            flash(cap_msg, 'danger')
+            return render_template('teacher/apply_offering.html', **_offering_form_context())
+
+        conflicts = check_offering_conflicts(
+            0, semester_id, tid, classroom_id, time_slot_ids, include_pending=True
         )
+        if conflicts['conflicts']:
+            flash('申请未提交：' + '；'.join(conflicts['conflicts']), 'danger')
+            return render_template('teacher/apply_offering.html', **_offering_form_context())
 
-        # 插入时间表
-        for slot_id in time_slot_ids:
-            execute(
-                """INSERT INTO offering_schedules (course_offering_id, time_slot_id, classroom_id)
-                   VALUES (%s,%s,%s)""",
-                (offering_id, slot_id, classroom_id)
+        try:
+            offering_id = insert(
+                """INSERT INTO course_offerings (course_id, teacher_id, semester_id, max_students, apply_reason)
+                   VALUES (%s,%s,%s,%s,%s)""",
+                (request.form['course_id'], tid, semester_id,
+                 max_students, request.form.get('apply_reason', ''))
             )
+            save_offering_schedules(offering_id, time_slot_ids, classroom_id)
+        except Exception as e:
+            if 'uk_offering' in str(e).lower() or 'duplicate' in str(e).lower():
+                flash('您本学期已申请过该课程，请勿重复提交', 'warning')
+            else:
+                flash(f'提交失败：{str(e)}', 'danger')
+            return render_template('teacher/apply_offering.html', **_offering_form_context())
 
-        flash('开课申请已提交，请等待管理员审核', 'success')
+        flash('开课申请已提交，排课信息已预检通过，请等待管理员审核', 'success')
         log_action('offering_apply', 'offering', offering_id, f'申请开课: course_id={request.form["course_id"]}')
         return redirect(url_for('teacher.my_offerings'))
 
-    courses = query('SELECT * FROM courses ORDER BY id')
-    semesters = query('SELECT * FROM semesters ORDER BY id DESC')
-    time_slots = query('SELECT * FROM time_slots ORDER BY day_of_week, period_num')
-    classrooms = query('SELECT * FROM classrooms WHERE is_active=1 ORDER BY code')
-    return render_template('teacher/apply_offering.html',
-                         courses=courses, semesters=semesters,
-                         time_slots=time_slots, classrooms=classrooms)
+    return render_template('teacher/apply_offering.html', **_offering_form_context())
+
+
+@teacher_bp.route('/check-conflicts', methods=['POST'])
+def check_conflicts_api():
+    """申请开课前实时冲突检测"""
+    tid = get_teacher_id()
+    data = request.get_json(silent=True) or {}
+    time_slot_ids = data.get('time_slot_ids', [])
+    classroom_id = data.get('classroom_id')
+    semester_id = data.get('semester_id')
+    offering_id = data.get('offering_id', 0)
+    max_students = data.get('max_students')
+
+    if not time_slot_ids or not classroom_id or not semester_id:
+        return jsonify({'ok': False, 'message': '请先选择学期、教室和上课时间'})
+
+    try:
+        result = check_offering_conflicts(
+            offering_id, semester_id, tid, classroom_id, time_slot_ids, include_pending=True
+        )
+        cap_ok, cap_msg = True, ''
+        if max_students:
+            cap_ok, cap_msg = check_classroom_capacity(classroom_id, int(max_students))
+        return jsonify({
+            'ok': not result['conflicts'] and cap_ok,
+            'conflicts': result['conflicts'],
+            'capacity_warning': cap_msg if not cap_ok else '',
+        })
+    except Exception as e:
+        return jsonify({'ok': True, 'conflicts': [], 'capacity_warning': '', 'check_error': str(e)})
 
 
 @teacher_bp.route('/my-offerings')
@@ -126,9 +168,27 @@ def my_offerings():
            ORDER BY co.created_at DESC""",
         (tid,)
     )
-    courses = query('SELECT * FROM courses ORDER BY id')
-    semesters = query('SELECT * FROM semesters ORDER BY id DESC')
-    return render_template('teacher/my_offerings.html', offerings=data, courses=courses, semesters=semesters)
+    for o in data:
+        o['schedule_display'] = get_offering_schedule(o['id'])
+        o['classroom_display'] = query(
+            """SELECT DISTINCT c.name FROM offering_schedules os
+               JOIN classrooms c ON os.classroom_id=c.id WHERE os.course_offering_id=%s""",
+            (o['id'],)
+        )
+        o['classroom_display'] = ', '.join(r['name'] for r in o['classroom_display']) or '-'
+        o['selected_slots'] = [
+            r['time_slot_id'] for r in query(
+                'SELECT time_slot_id FROM offering_schedules WHERE course_offering_id=%s', (o['id'],)
+            )
+        ]
+        o['classroom_id'] = query(
+            'SELECT classroom_id FROM offering_schedules WHERE course_offering_id=%s LIMIT 1',
+            (o['id'],), one=True
+        )
+        o['classroom_id'] = o['classroom_id']['classroom_id'] if o['classroom_id'] else None
+
+    ctx = _offering_form_context()
+    return render_template('teacher/my_offerings.html', offerings=data, **ctx)
 
 
 @teacher_bp.route('/offering/<int:oid>/withdraw', methods=['POST'])
@@ -146,17 +206,40 @@ def withdraw_offering(oid):
 
 @teacher_bp.route('/offering/<int:oid>/edit', methods=['POST'])
 def edit_offering(oid):
+    tid = get_teacher_id()
     require_offering_owner(oid)
     o = query('SELECT status FROM course_offerings WHERE id=%s', (oid,), one=True)
     if not o or o['status'] != 'pending':
         flash('只能编辑待审核的申请', 'warning')
         return redirect(url_for('teacher.my_offerings'))
-    execute("""UPDATE course_offerings SET course_id=%s, semester_id=%s, max_students=%s,
-               classroom=%s, schedule=%s, apply_reason=%s WHERE id=%s AND status='pending'""",
-            (request.form['course_id'], request.form['semester_id'],
-             request.form['max_students'], request.form.get('classroom', ''),
-             request.form.get('schedule', ''), request.form.get('apply_reason', ''), oid))
-    flash('开课申请已更新', 'success')
+
+    time_slot_ids = request.form.getlist('time_slots', type=int)
+    classroom_id = request.form.get('classroom_id', type=int)
+    semester_id = request.form.get('semester_id', type=int)
+    max_students = request.form.get('max_students', type=int)
+
+    if not time_slot_ids or not classroom_id:
+        flash('请选择上课时间和教室', 'danger')
+        return redirect(url_for('teacher.my_offerings'))
+
+    ok, cap_msg = check_classroom_capacity(classroom_id, max_students)
+    if not ok:
+        flash(cap_msg, 'danger')
+        return redirect(url_for('teacher.my_offerings'))
+
+    conflicts = check_offering_conflicts(
+        oid, semester_id, tid, classroom_id, time_slot_ids, include_pending=True
+    )
+    if conflicts['conflicts']:
+        flash('修改未保存：' + '；'.join(conflicts['conflicts']), 'danger')
+        return redirect(url_for('teacher.my_offerings'))
+
+    execute("""UPDATE course_offerings SET course_id=%s, semester_id=%s, max_students=%s, apply_reason=%s
+               WHERE id=%s AND status='pending'""",
+            (request.form['course_id'], semester_id, max_students,
+             request.form.get('apply_reason', ''), oid))
+    save_offering_schedules(oid, time_slot_ids, classroom_id)
+    flash('开课申请已更新，排课信息已重新校验', 'success')
     log_action('offering_edit', 'offering', oid, f'修改开课申请ID={oid}')
     return redirect(url_for('teacher.my_offerings'))
 
